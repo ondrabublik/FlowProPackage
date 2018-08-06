@@ -1,0 +1,12 @@
+[submodule "FlowPro"]
+	path = FlowPro
+	url = https://github.com/ondrabublik/FlowPro.git
+[submodule "FlowProAPI"]
+	path = FlowProAPI
+	url = https://github.com/ondrabublik/FlowProAPI.git
+[submodule "Aerodynamics"]
+	path = Aerodynamics
+	url = https://github.com/ondrabublik/FlowPro-Aerodynamics.git
+[submodule "ModuleProjects/Equations/Aerodynamics"]
+	path = ModuleProjects/Equations/Aerodynamics
+	url = https://github.com/ondrabublik/FlowPro-Aerodynamics.git
