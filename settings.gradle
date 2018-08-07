@@ -1,24 +1,25 @@
 rootProject.name = 'FlowProPackage'
 
-include 'FlowPro', 'FlowProAPI', ':Aerodynamics'
+include 'FlowPro', 'FlowProAPI'//, ':Aerodynamics'
 
-project(':Aerodynamics').projectDir = file('ModuleProjects/Equations/Aerodynamics')
 
-//// Find the directories containing a "build.gradle" file in the root directory
-//// of the project. That is, every directory containing a "build.gradle" will
-//// be automatically the subproject of this project.
-//def subDirs = rootDir.listFiles(new FileFilter() {
-//    public boolean accept(File file) {
-//        if (!file.isDirectory()) {
-//            return false
-//        }
+def File modelProjectDir = new File("${rootDir}/ModuleProjects/Equations")
+
+def subDirs = modelProjectDir.listFiles(new FileFilter() {
+    public boolean accept(File file) {
+        if (!file.isDirectory()) {
+            return false
+        }
 //        if (file.name == 'buildSrc') {
 //            return false
 //        }
-//        return new File(file, 'build.gradle').isFile()
-//    }
-//});
-//
-//subDirs.each { File dir ->
-//    include dir.name
-//}
+        return new File(file, 'build.gradle').isFile()
+    }    
+});
+
+subDirs.each { File dir ->
+    def projectName = ":$dir.name"
+    include projectName
+    project(projectName).projectDir = dir
+}
+
