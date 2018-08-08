@@ -7,12 +7,6 @@
 [submodule "ModuleProjects/Equations/Aerodynamics"]
 	path = ModuleProjects/Equations/Aerodynamics
 	url = https://github.com/ondrabublik/FlowPro-Aerodynamics.git
-[submodule "FlowPro-RigidBody-dynamics"]
-	path = FlowPro-RigidBody-dynamics
-	url = https://github.com/ondrabublik/FlowPro-RigidBody-dynamics.git
-[submodule "ModuleProjectsDynamicsRigidBody"]
-	path = ModuleProjectsDynamicsRigidBody
-	url = https://github.com/ondrabublik/FlowPro-RigidBody-dynamics.git
 [submodule "ModuleProjects/Dynamics/RigidBody"]
 	path = ModuleProjects/Dynamics/RigidBody
 	url = https://github.com/ondrabublik/FlowPro-RigidBody-dynamics.git
