@@ -23,10 +23,9 @@ subprojects {
         implementation project(':FlowProAPI')
     }
         
+    def modulJarDir = new File(moduleDir.toPath().toString())    
     task copyJar(type: Copy) {
-        def File projectDir = new File("${projectDir}")
-        def relPath = modelProjectDir.toPath().relativize(projectDir.getParentFile().toPath())
-        def modulJarDir = new File(moduleDir.toPath().toString() + '/' + relPath)
+        def File projectDir = new File("${projectDir}")    
         if (!modulJarDir.exists()) {
             modulJarDir.mkdirs()
         }
