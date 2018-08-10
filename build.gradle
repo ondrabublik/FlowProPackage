@@ -18,25 +18,24 @@ subprojects {
     def projectName = "$project.name"
     println projectName
     if (projectName != 'FlowPro' && projectName != 'FlowProAPI') {
-//project(':Aerodynamics') {
-    dependencies {
-        implementation project(':FlowProAPI')
-    }
-        
-    def modulJarDir = new File(moduleDir.toPath().toString())    
-    task copyJar(type: Copy) {
-        def File projectDir = new File("${projectDir}")    
-        if (!modulJarDir.exists()) {
-            modulJarDir.mkdirs()
+        dependencies {
+            implementation project(':FlowProAPI')
         }
         
-        from jar
-        into modulJarDir
-        rename { String fileName ->
-            fileName = "${project.name}.jar"
+        def modulJarDir = new File(moduleDir.toPath().toString())    
+        task copyJar(type: Copy) {
+            def File projectDir = new File("${projectDir}")    
+            if (!modulJarDir.exists()) {
+                modulJarDir.mkdirs()
+            }
+        
+            from jar
+            into modulJarDir
+            rename { String fileName ->
+                fileName = "${project.name}.jar"
+            }
         }
-    }
-    jar.finalizedBy copyJar
+        jar.finalizedBy copyJar
     }
 }
 

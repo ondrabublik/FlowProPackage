@@ -2,24 +2,29 @@ rootProject.name = 'FlowProPackage'
 
 include 'FlowPro', 'FlowProAPI'//, ':Aerodynamics'
 
-
-def File modelProjectDir = new File("${rootDir}/ModuleProjects/Equations")
-
-def subDirs = modelProjectDir.listFiles(new FileFilter() {
-    public boolean accept(File file) {
-        if (!file.isDirectory()) {
-            return false
-        }
-//        if (file.name == 'buildSrc') {
+//def File modelProjectDir = new File("${rootDir}/ModuleProjects/Equations")
+//
+//def subDirs = modelProjectDir.listFiles(new FileFilter() {
+//    public boolean accept(File file) {
+//        if (!file.isDirectory()) {
 //            return false
 //        }
-        return new File(file, 'build.gradle').isFile()
-    }    
-});
+//        return new File(file, 'build.gradle').isFile()
+//    }    
+//});
+//
+//subDirs.each { File dir ->
+//    def projectName = ":$dir.name"
+//    include projectName
+//    project(projectName).projectDir = dir
+//}
 
-subDirs.each { File dir ->
-    def projectName = ":$dir.name"
-    include projectName
-    project(projectName).projectDir = dir
+def File modelProjectDir = new File("${rootDir}/ModuleProjects")
+
+modelProjectDir.eachDirRecurse () {file ->
+    if (file.isDirectory() & new File(file, 'build.gradle').isFile()) {
+        def projectName = ":$file.name"
+        include projectName
+        project(projectName).projectDir = file
+    }
 }
-
