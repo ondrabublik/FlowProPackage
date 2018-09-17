@@ -4,6 +4,9 @@
 [submodule "FlowProAPI"]
 	path = FlowProAPI
 	url = https://github.com/ondrabublik/FlowProAPI.git
+[submodule "FlowProManager"]
+	path = FlowProManager
+	url = https://github.com/ondrabublik/FlowProManager.git
 [submodule "ModuleProjects/Equations/Aerodynamics"]
 	path = ModuleProjects/Equations/Aerodynamics
 	url = https://github.com/ondrabublik/FlowPro-Aerodynamics.git

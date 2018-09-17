@@ -1,23 +1,6 @@
 rootProject.name = 'FlowProPackage'
 
-include 'FlowPro', 'FlowProAPI'//, ':Aerodynamics'
-
-//def File modelProjectDir = new File("${rootDir}/ModuleProjects/Equations")
-//
-//def subDirs = modelProjectDir.listFiles(new FileFilter() {
-//    public boolean accept(File file) {
-//        if (!file.isDirectory()) {
-//            return false
-//        }
-//        return new File(file, 'build.gradle').isFile()
-//    }    
-//});
-//
-//subDirs.each { File dir ->
-//    def projectName = ":$dir.name"
-//    include projectName
-//    project(projectName).projectDir = dir
-//}
+include 'FlowPro', 'FlowProAPI'
 
 def File modelProjectDir = new File("${rootDir}/ModuleProjects")
 
