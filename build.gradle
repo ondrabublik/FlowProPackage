@@ -16,15 +16,15 @@ def File modelProjectDir = new File("${rootDir}/ModuleProjects")
 
 subprojects {
     def projectName = "$project.name"
-    if (projectName != 'FlowPro' && projectName != 'FlowProAPI') {
+    if (projectName != 'FlowPro' && projectName != 'FlowProAPI' && projectName != 'FlowProManager') {
         dependencies {
             implementation project(':FlowProAPI')
         }
         
         task copyJar(type: Copy) {
             def File projectDir = new File("${projectDir}")          
-        def relPath = modelProjectDir.toPath().relativize(projectDir.getParentFile().toPath())
-        def modulJarDir = new File(moduleDir.toPath().toString() + '/' + relPath)
+            def relPath = modelProjectDir.toPath().relativize(projectDir.getParentFile().toPath())
+            def modulJarDir = new File(moduleDir.toPath().toString() + '/' + relPath.toString().toLowerCase())
             if (!modulJarDir.exists()) {
                 modulJarDir.mkdirs()
             }
@@ -37,6 +37,24 @@ subprojects {
         }
         jar.finalizedBy copyJar
     }
+}
+
+project(':FlowProManager') {
+    dependencies {
+        implementation project(':FlowProAPI')
+    }
+    
+    task copyJar {
+        doLast {
+            def src = jar.outputs.files[0]
+            def dst = new File("${project(':FlowPro').projectDir}/FlowProManager.jar")
+            if(dst.exists()){
+                dst.delete()
+            }
+            dst << src.bytes
+        }
+    }
+    jar.finalizedBy copyJar
 }
 
 project(':FlowPro') {
