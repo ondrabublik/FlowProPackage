@@ -6,7 +6,7 @@ subprojects {
     apply from: rootProject.file('common.gradle')
 }
 
-def moduleDir = new File("${project('FlowPro').projectDir}/modules")
+def moduleDir = new File("${project(':FlowPro').projectDir}/modules")
 if (!moduleDir.exists()) {
     moduleDir.mkdirs()
 }
