@@ -16,7 +16,7 @@ def File modelProjectDir = new File("${rootDir}/ModuleProjects")
 
 subprojects {
     def projectName = "$project.name"
-    if (projectName != 'FlowPro' && projectName != 'FlowProAPI' && projectName != 'FlowProManager') {
+    if (projectName != 'FlowPro' && projectName != 'FlowProAPI' && projectName != 'FlowProManager' && projectName != 'Fetcher') {
         dependencies {
             implementation project(':FlowProAPI')
         }
@@ -42,6 +42,7 @@ subprojects {
 project(':FlowProManager') {
     dependencies {
         implementation project(':FlowProAPI')
+        implementation project(':Fetcher')
     }
     
     task copyJar {
@@ -57,9 +58,24 @@ project(':FlowProManager') {
     jar.finalizedBy copyJar
 }
 
+project(':Fetcher') {
+    task copyJar {
+        doLast {
+            def src = jar.outputs.files[0]
+            def dst = new File("${project(':FlowPro').projectDir}/Fetcher.jar")
+            if(dst.exists()){
+                dst.delete()
+            }
+            dst << src.bytes
+        }
+    }
+    jar.finalizedBy copyJar
+}
+
 project(':FlowPro') {
     dependencies {
         implementation project(':FlowProAPI')
+        implementation project(':Fetcher')
     }
 }
 
