@@ -114,6 +114,14 @@ public class Schrodinger implements Equation {
     }
 
     @Override
+    public double[] combineShockSensors(double[] shock){
+        for(int m = 1; m < nEqs; m++){
+            shock[m] = shock[0];
+        }
+        return shock;
+    }
+    
+    @Override
     public void saveReferenceValues(String filePath) throws IOException {
     }
 

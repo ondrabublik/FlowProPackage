@@ -22,13 +22,13 @@ public class NURBS2D implements DomainTransformationObject {
         double tx = X[0];
         double ty = X[1];
         
-        double x = tx;
-        double bump = 0.1 * Math.exp(-(tx - 1.5) * (tx - 1.5) / 0.02);
-        double y = ty + bump*(1-ty);
+//        double x = tx;
+//        double bump = 0.1 * Math.exp(-(tx - 1.5) * (tx - 1.5) / 0.02);
+//        double y = ty + bump*(1-ty);
         
-//        double x = 3*tx;
-//        double bump = 0.1 * Math.exp(-(tx - 0.5) * (tx - 0.5) / 0.02);
-//        double y = (1-bump)*ty + bump*(1-ty);
+        double x = 3*tx;
+        double bump = 0.1 * Math.exp(-(tx - 0.5) * (tx - 0.5) / 0.02);
+        double y = (1-bump)*ty + bump*(1-ty);
         return new double[]{x,y};
         //return X;
     }

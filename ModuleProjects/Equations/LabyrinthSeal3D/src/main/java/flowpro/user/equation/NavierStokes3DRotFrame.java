@@ -590,6 +590,14 @@ public class NavierStokes3DRotFrame implements Equation {
     }
 
     @Override
+    public double[] combineShockSensors(double[] shock){
+        for(int m = 1; m < nEqs; m++){
+            shock[m] = shock[0]; // all shock sensors are acording density
+        }
+        return shock;
+    }
+    
+    @Override
     public void saveReferenceValues(String filePath) throws IOException {
         FlowProProperties output = new FlowProProperties();
 
