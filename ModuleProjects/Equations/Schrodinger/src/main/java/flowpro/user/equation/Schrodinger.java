@@ -56,10 +56,6 @@ public class Schrodinger implements Equation {
         return new double[]{0, 0};
     }
 
-    @Override
-    public void limitUnphysicalValues(double[] Ws, double[] W, int nBasis) { // limituje zaporne hodnoty
-    }
-
     //  nevazky tok stenou _____________________________________________________
     @Override
     public double[] numericalConvectiveFlux(double WL[], double WR[], double[] n, int TT, ElementData elem) {

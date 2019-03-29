@@ -267,6 +267,7 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
         double v = W[2] / r;
         double w = W[3] / r;
         double rx = dW[0];
+        
         double ry = dW[nEqs];
         double rz = dW[2 * nEqs];
         double ux = 1 / r * (dW[1] - rx * u);

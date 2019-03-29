@@ -117,13 +117,8 @@ public class NavierStokes3DRotFrame implements Equation {
 
     @Override
     public boolean isSourcePresent() {
-        return false;
+        return true;
     }
-
-    @Override
-    public double[] sourceTerm(double[] W, double[] dW, ElementData elem) { // zdrojovy clen
-        throw new UnsupportedOperationException("source is not present");
-    }    
     
     public void init(FlowProProperties props) throws IOException {
         this.nEqs = 5;
@@ -243,7 +238,8 @@ public class NavierStokes3DRotFrame implements Equation {
         double ReInf = -1;
         if (isDiffusive) {
             if (props.containsKey("reynolds") && props.containsKey("prandtl")
-                    && !props.containsKey("viscosity") && !props.containsKey("conductivity")) {
+                    && !props.containsKey("vis"
+                            + "cosity") && !props.containsKey("conductivity")) {
 
                 Re = props.getDouble("reynolds");
                 Pr = props.getDouble("prandtl");
@@ -289,6 +285,21 @@ public class NavierStokes3DRotFrame implements Equation {
             return new double[]{rhoIn, rhoIn * uIn, rhoIn * vIn, rhoIn * wIn, EIn};
         }
     }
+    
+    @Override
+    public double[] sourceTerm(double[] W, double[] dW, ElementData elem) { // zdrojovy clen
+        W[0] = limiteRho(W[0]);
+
+        double[] sour = new double[nEqs];
+        double[] Fcentrifugal = Mat.times(Mat.cross(omega, Mat.cross(omega, elem.currentX)), -W[0]);
+        double[] Vref = new double[]{W[1] / W[0], W[2] / W[0], W[3] / W[0]};
+        double[] Fcoriolis = Mat.times(Mat.cross(omega, Vref), -2.0 * W[0]);
+        sour[1] = Fcentrifugal[0] + Fcoriolis[0];
+        sour[2] = Fcentrifugal[1] + Fcoriolis[1];
+        sour[3] = Fcentrifugal[2] + Fcoriolis[2];
+        
+        return sour;
+    }    
     
     @Override
     public double[] boundaryValue(double[] WL, double[] n, int TT, ElementData elem) {
@@ -363,7 +374,7 @@ public class NavierStokes3DRotFrame implements Equation {
                     double uinl = Vinl * Math.cos(attackAngleAlfa) * Math.cos(attackAngleBeta) + uRot[0];
                     double vinl = Vinl * Math.sin(attackAngleAlfa) * Math.cos(attackAngleBeta) + uRot[1];
                     double winl = Vinl * Math.sin(attackAngleAlfa) * Math.sin(attackAngleBeta) + uRot[2];
-                    double Einl = p / (kapa - 1) + 0.5 * Rinl * Vinl * Vinl - Rinl * Math.pow(Mat.L2Norm(Mat.cross(omega, elem.currentX)), 2) / 2;
+                    double Einl = p / (kapa - 1) + 0.5 * Rinl * Vinl * Vinl - 0*Rinl * Math.pow(Mat.L2Norm(Mat.cross(omega, elem.currentX)), 2) / 2;
                     WR[0] = Rinl;
                     WR[1] = Rinl * uinl;
                     WR[2] = Rinl * vinl;
@@ -576,20 +587,6 @@ public class NavierStokes3DRotFrame implements Equation {
     }
 
     @Override
-    public void limitUnphysicalValues(double[] Ws, double[] W, int nBasis) { // limituje zaporne hodnoty
-        if (Ws[0] < rhoTol) {
-            for (int j = 0; j < nBasis; j++) {
-                W[j] = rhoTol;
-            }
-        }
-        if (Ws[4] < (Ws[1] * Ws[1] + Ws[2] * Ws[2] + Ws[3] * Ws[3]) / (2 * Ws[0])) {
-            for (int j = 0; j < nBasis; j++) {
-                //W[j][4] = (Ws[1] * Ws[1] + Ws[2] * Ws[2] + Ws[3] * Ws[3]) / (2 * Ws[0]);
-            }
-        }
-    }
-
-    @Override
     public double[] combineShockSensors(double[] shock){
         for(int m = 1; m < nEqs; m++){
             shock[m] = shock[0]; // all shock sensors are acording density
@@ -668,7 +665,7 @@ public class NavierStokes3DRotFrame implements Equation {
                 return new double[]{pRef * W[dim + 1]};
 
             case "pressure":
-                return new double[]{pRef * pressure(W)};
+                return new double[]{pRef * pressure(W, X)};
 
             default:
                 throw new UnsupportedOperationException("undefined value " + name);
