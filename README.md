@@ -16,5 +16,6 @@ FlowProPackage is not necessary for the use of [FlowPro](https://github.com/ondr
 git clone --recursive https://github.com/ondrabublik/FlowProPackage.git FlowProPackage
 cd FlowProPackage
 gradle build
-java -jar FlowPro.jar
+cd FlowPro
+java -jar FlowPro.jar local
 ```

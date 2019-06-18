@@ -1,0 +1,10 @@
+17:33:51  INFO FlowProMain - starting FlowPro...
+17:33:51 ERROR FlowProMain - input arguments have a wrong format: no argument was specified
+java.lang.IllegalArgumentException: no argument was specified
+	at flowpro.core.FlowProMain.main(FlowProMain.java:83)
+17:33:55  INFO FlowProMain - starting FlowPro...
+17:33:55 ERROR FlowProMain - args.txt (The system cannot find the file specified)
+17:34:50  INFO FlowProMain - starting FlowPro...
+17:34:50 ERROR FlowProMain - input arguments have a wrong format: no argument was specified
+java.lang.IllegalArgumentException: no argument was specified
+	at flowpro.core.FlowProMain.main(FlowProMain.java:83)
