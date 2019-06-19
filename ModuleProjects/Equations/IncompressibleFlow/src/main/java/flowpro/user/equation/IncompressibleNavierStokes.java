@@ -82,10 +82,10 @@ public class IncompressibleNavierStokes implements Equation {
         } else {
             lRef = 1;
         }
-        
+
         velocityRef = 0;
         for (int d = 0; d < dim; ++d) {
-            velocityRef += VIn[d]*VIn[d];
+            velocityRef += VIn[d] * VIn[d];
         }
         velocityRef = Math.sqrt(velocityRef);
         tRef = lRef / velocityRef;
@@ -113,10 +113,6 @@ public class IncompressibleNavierStokes implements Equation {
         }
     }
 
-    @Override
-    public void limitUnphysicalValues(double[] Ws, double[] W, int nBasis) { // limituje zaporne hodnoty
-    }
-
     //  nevazky tok stenou _____________________________________________________
     @Override
     public double[] numericalConvectiveFlux(double WL[], double WR[], double[] n, int TT, ElementData elem) {
@@ -136,12 +132,46 @@ public class IncompressibleNavierStokes implements Equation {
                 break;
 
             default: // vnitrni stena
-                double[] fL = convectiveFlux(WL, n, elem);
-                double[] fR = convectiveFlux(WR, n, elem);
-                double maxEigenValue = Math.max(maxEigenvalue(WL, elem), maxEigenvalue(WR, elem));
-                for (int j = 0; j < nEqs; j++) {
-                    f[j] = (fL[j] + fR[j] - maxEigenValue * (WR[j] - WL[j])) / 2;
+//                double[] fL = convectiveFlux(WL, n, elem);
+//                double[] fR = convectiveFlux(WR, n, elem);
+//                double maxEigenValue = Math.max(maxEigenvalue(WL, elem), maxEigenvalue(WR, elem));
+//                for (int j = 0; j < nEqs; j++) {
+//                    f[j] = (fL[j] + fR[j] - maxEigenValue * (WR[j] - WL[j])) / 2;
+//                }
+
+                double c2 = 1000;
+                double[] Wstar = new double[nEqs];
+                // pressure
+                double VnL = 0;
+                double VnR = 0;
+                for (int d = 0; d < dim; ++d) {
+                    VnL += WL[d + 1] * n[d];
+                    VnR += WR[d + 1] * n[d];
                 }
+                double beta = (VnL + VnR) / 2;
+                double alfa = Math.sqrt(beta * beta + 4 * c2);
+                double dp = WR[0] - WL[0];
+                double du = VnR - VnL;
+                double us = (VnL + VnR) / 2 - dp / alfa - beta / (2 * alfa) * du;
+                double ps = (WL[0] + WR[0]) / 2 - c2 / alfa * du + beta / (2 * alfa) * dp;
+                
+                // tangential velocity
+                double[] vt = new double[dim];
+                if (us > 0) {
+                    for (int d = 0; d < dim; d++) {
+                        vt[d] = WL[d + 1] - VnL * n[d];
+                    }
+                } else {
+                    for (int d = 0; d < dim; d++) {
+                        vt[d] = WR[d + 1] - VnR * n[d];
+                    }
+                }
+                
+                Wstar[0] = ps;
+                for (int d = 0; d < dim; d++) {
+                    Wstar[d + 1] = us * n[d] + vt[d];
+                }
+                f = convectiveFlux(Wstar, n, elem);
                 break;
         }
 
@@ -253,7 +283,7 @@ public class IncompressibleNavierStokes implements Equation {
             case (BoundaryType.INLET):
                 WR[0] = WL[0];
                 for (int d = 0; d < dim; ++d) {
-                    WR[d+1] = VIn[d];
+                    WR[d + 1] = VIn[d];
                 }
                 break;
 
@@ -302,6 +332,14 @@ public class IncompressibleNavierStokes implements Equation {
         return TT == BoundaryType.WALL;
     }
 
+    @Override
+    public double[] combineShockSensors(double[] shock){
+        for(int m = 1; m < nEqs; m++){
+            shock[m] = shock[0]; // all shock sensors are acording divergence
+        }
+        return shock;
+    }
+    
     @Override
     public void saveReferenceValues(String filePath) throws IOException {
         FlowProProperties output = new FlowProProperties();

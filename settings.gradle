@@ -1,6 +1,6 @@
 rootProject.name = 'FlowProPackage'
 
-include 'FlowPro', 'FlowProAPI', 'FlowProManager'
+include 'FlowPro', 'FlowProAPI', 'FlowProManager', 'Fetcher'
 
 def File modelProjectDir = new File("${rootDir}/ModuleProjects")
 
