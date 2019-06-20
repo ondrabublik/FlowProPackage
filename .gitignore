@@ -1,4 +1,4 @@
 .gradle
-.nb-gradle
-/Fetcher/build/
+.nb-gradle*
+log*
 /ModuleProjects/DomainTransformationObject/build/
