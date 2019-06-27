@@ -15,7 +15,7 @@ import java.io.IOException;
  * @author obublik
  */
 public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFrame {
-
+    
     double vtIn; // turbulence intensity at the inlet
 
     // model turbulence
@@ -87,10 +87,10 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
         double p;
 
         switch (TT) {
-            case (-1):
-            case (-4):
-            case (-5):
-            case (-6): // stena
+            case (BoundaryType.WALL):
+            case (BoundaryType.INVISCID_WALL):
+            case (BoundaryType.STATOR):
+            case (BoundaryType.ROTOR): // stena
                 p = pressure(WL, elem.currentX);
                 fn[0] = 0;
                 fn[1] = p * n[0];
@@ -100,11 +100,11 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
                 fn[5] = 0;
                 break;
 
-            case (-2): // vstup
+            case (BoundaryType.INLET): // vstup
                 fn = convectiveFlux(WR, n, elem);
                 break;
 
-            case (-3): // vystup
+            case (BoundaryType.OUTLET): // vystup
                 fn = convectiveFlux(WR, n, elem);
                 break;
 
@@ -144,109 +144,165 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
     }
 
     @Override
-    public double[] numericalDiffusiveFlux(double Wc[], double dWc[], double[] n, int TT, ElementData elem) {
-        Wc[0] = limiteRho(Wc[0]);
-
-        double[] fvn = diffusiveFlux(Wc, dWc, n, elem);
-
-        if (TT < 0) {
-            if (TT == -1 || TT == -5 || TT == -6) {
-                double[] W = boundaryValue(Wc, n, TT, elem);
-                fvn[4] = fvn[1] * W[1] / W[0] + fvn[2] * W[2] / W[0] + fvn[3] * W[3] / W[0];
-            } else {
-                for (int j = 0; j < nEqs; j++) {
-                    fvn[j] = 0;
-                }
-            }
-        }
-        return fvn;
-    }
-
-    @Override
     public double[] diffusiveFlux(double[] W, double[] dW, double[] n, ElementData elem) {
         W[0] = limiteRho(W[0]);
+        double rho = W[0];
 
-        double[] fvn = new double[nEqs];
-        double r = W[0];
-        double u = W[1] / r;
-        double v = W[2] / r;
-        double w = W[3] / r;
-        double rx = dW[0];
-        double ry = dW[nEqs];
-        double rz = dW[2 * nEqs];
-        double ux = 1 / r * (dW[1] - rx * u);
-        double uy = 1 / r * (dW[nEqs + 1] - ry * u);
-        double uz = 1 / r * (dW[2 * nEqs + 1] - rz * u);
-        double vx = 1 / r * (dW[2] - rx * v);
-        double vy = 1 / r * (dW[nEqs + 2] - ry * v);
-        double vz = 1 / r * (dW[2 * nEqs + 2] - rz * v);
-        double wx = 1 / r * (dW[3] - rx * w);
-        double wy = 1 / r * (dW[nEqs + 3] - ry * w);
-        double wz = 1 / r * (dW[2 * nEqs + 3] - rz * w);
-        double Ex = dW[4];
-        double Ey = dW[nEqs + 4];
-        double Ez = dW[2 * nEqs + 4];
-        double p = pressure(W, elem.currentX);
-        double px = (kapa - 1) * (Ex - 0.5 * rx * (u * u + v * v + w * w) - r * (u * ux + v * vx + w * wx));
-        double py = (kapa - 1) * (Ey - 0.5 * ry * (u * u + v * v + w * w) - r * (u * uy + v * vy + w * wy));
-        double pz = (kapa - 1) * (Ez - 0.5 * rz * (u * u + v * v + w * w) - r * (u * uz + v * vz + w * wz));
-        double prx = (r * px - p * rx) / (r * r);
-        double pry = (r * py - p * ry) / (r * r);
-        double prz = (r * pz - p * rz) / (r * r);
+        double lam = -2. / 3; // Stokesuv vztah
 
-        double vt = W[5] / r;
-        double vtx = 1 / r * (dW[5] - rx * vt);
-        double vty = 1 / r * (dW[nEqs + 5] - ry * vt);
-        double vtz = 1 / r * (dW[2 * nEqs + 5] - rz * vt);
-
-        double Sxx = ux - 1.0 / 3 * (ux + vy + wz);
-        double Syy = vy - 1.0 / 3 * (ux + vy + wz);
-        double Szz = wz - 1.0 / 3 * (ux + vy + wz);
-        double Sxy = 0.5 * (vx + uy);
-        double Sxz = 0.5 * (wx + uz);
-        double Syz = 0.5 * (wy + vz);
-
-        double txx = 2 * Sxx;
-        double tyy = 2 * Syy;
-        double tzz = 2 * Szz;
-        double txy = 2 * Sxy;
-        double txz = 2 * Sxz;
-        double tyz = 2 * Syz;
-
-        // turbulence
-        if (vt < 0) {
-            vt = 0;
+        double[] velocity = new double[dim];
+        double velocity2 = .0;
+        for (int d = 0; d < dim; ++d) {
+            velocity[d] = W[d + 1] / rho;
+            velocity2 += velocity[d] * velocity[d];
         }
 
-        double xi = r * vt; // vt/v
+        double[] velocityJac = new double[dim * dim];
+        for (int d = 0; d < dim; ++d) {
+            for (int f = 0; f < dim; ++f) {
+                velocityJac[dim * d + f] = (dW[f * nEqs + d + 1] - dW[f * nEqs] * velocity[d]) / rho;
+            }
+        }
+
+        double p = pressure(W, elem.currentX);
+        double[] pOverRhoDer = new double[dim];
+        for (int d = 0; d < dim; ++d) {
+            double temp = .0;
+            for (int f = 0; f < dim; ++f) {
+                temp += velocity[f] * velocityJac[dim * f + d];
+            }
+            double pDer = (kapa - 1) * (dW[d * nEqs + dim + 1] - dW[d * nEqs] * velocity2 / 2 - rho * temp);
+            pOverRhoDer[d] = (rho * pDer - p * dW[d * nEqs]) / (rho * rho);
+        }
+
+        // stress tensor calculation
+        double[] stress = new double[dim * dim];
+        double trace = .0;
+        for (int d = 0; d < dim; ++d) {
+            trace += velocityJac[dim * d + d];
+            for (int f = 0; f < dim; ++f) {
+                stress[dim * d + f] = velocityJac[dim * d + f] + velocityJac[dim * f + d];
+            }
+        }
+        for (int d = 0; d < dim; ++d) {
+            stress[dim * d + d] += lam * trace;
+        }
+
+        double vt = W[5] / rho;
+        double[] dvt = new double[dim]; 
+        for (int d = 0; d < dim; ++d) {
+            dvt[d] = (dW[5] - dW[d * nEqs] * vt)/rho;
+        }
+        
+        double xi = rho * vt; // vt/v
         double fv1 = xi * xi * xi / (xi * xi * xi + cv1 * cv1 * cv1);
-        double mut = r * vt * fv1;
-        double Txx = 2 * mut * Sxx;
-        double Tyy = 2 * mut * Syy;
-        double Tzz = 2 * mut * Szz;
-        double Txy = 2 * mut * Sxy;
-        double Txz = 2 * mut * Sxz;
-        double Tyz = 2 * mut * Syz;
-
-        fvn[0] = 0;
-        fvn[1] = 1 / Re * (txx + Txx) * n[0];
-        fvn[2] = 1 / Re * (txy + Txy) * n[0];
-        fvn[3] = 1 / Re * (txz + Txz) * n[0];
-        fvn[4] = (1 / Re * (u * (txx + Txx) + v * (txy + Txy) + w * (txz + Txz) + kapa / (kapa - 1) * (1 / Pr + mut / Prt) * prx)) * n[0];
-        fvn[5] = 1 / (Re * sigma) * (1 + r * vt) * vtx * n[0];
-
-        fvn[1] = fvn[1] + 1 / Re * (txy + Txy) * n[1];
-        fvn[2] = fvn[2] + 1 / Re * (tyy + Tyy) * n[1];
-        fvn[3] = fvn[3] + 1 / Re * (tyz + Tyz) * n[1];
-        fvn[4] = fvn[4] + (1 / Re * (u * (txy + Txy) + v * (tyy + Tyy) + w * (tyz + Tyz) + kapa / (kapa - 1) * (1 / Pr + mut / Prt) * pry)) * n[1];
-        fvn[5] = fvn[5] + 1 / (Re * sigma) * (1 + r * vt) * vty * n[1];
-
-        fvn[1] = fvn[1] + 1 / Re * (txz + Txz) * n[2];
-        fvn[2] = fvn[2] + 1 / Re * (tyz + Tyz) * n[2];
-        fvn[3] = fvn[3] + 1 / Re * (tzz + Tzz) * n[2];
-        fvn[4] = fvn[4] + (1 / Re * (u * (txz + Txz) + v * (tyz + Tyz) + w * (tzz + Tzz) + kapa / (kapa - 1) * (1 / Pr + mut / Prt) * prz)) * n[2];
-        fvn[5] = fvn[5] + 1 / (Re * sigma) * (1 + r * vt) * vtz * n[2];
-        return fvn;
+        double mut = rho * vt * fv1;
+        
+        // add turbulence stress
+        for (int d = 0; d < dim; ++d) {
+            for (int f = 0; f < dim; ++f) {
+                stress[dim * d + f] *= (1 + mut);
+            }
+        }
+        
+        double constant = kapa / (kapa - 1)*(1/ Pr + mut / Prt);
+        double[] flux = new double[nEqs];
+        flux[0] = 0;
+        for (int d = 0; d < dim; ++d) {
+            double tmp = .0;
+            for (int f = 0; f < dim; ++f) {
+                flux[f + 1] += stress[dim * d + f] * n[d] / Re;
+                tmp += velocity[f] * stress[dim * d + f];
+            }
+            flux[dim + 1] += (tmp + constant * pOverRhoDer[d]) * n[d] / Re;
+            flux[dim + 2] += 1 / (Re * sigma) * (1 + rho * vt) * dvt[d] * n[d];
+        }
+        return flux;
+        
+        
+//        W[0] = limiteRho(W[0]);
+//
+//        double[] fvn = new double[nEqs];
+//        double r = W[0];
+//        double u = W[1] / r;
+//        double v = W[2] / r;
+//        double w = W[3] / r;
+//        double rx = dW[0];
+//        double ry = dW[nEqs];
+//        double rz = dW[2 * nEqs];
+//        double ux = 1 / r * (dW[1] - rx * u);
+//        double uy = 1 / r * (dW[nEqs + 1] - ry * u);
+//        double uz = 1 / r * (dW[2 * nEqs + 1] - rz * u);
+//        double vx = 1 / r * (dW[2] - rx * v);
+//        double vy = 1 / r * (dW[nEqs + 2] - ry * v);
+//        double vz = 1 / r * (dW[2 * nEqs + 2] - rz * v);
+//        double wx = 1 / r * (dW[3] - rx * w);
+//        double wy = 1 / r * (dW[nEqs + 3] - ry * w);
+//        double wz = 1 / r * (dW[2 * nEqs + 3] - rz * w);
+//        double Ex = dW[4];
+//        double Ey = dW[nEqs + 4];
+//        double Ez = dW[2 * nEqs + 4];
+//        double p = pressure(W, elem.currentX);
+//        double px = (kapa - 1) * (Ex - 0.5 * rx * (u * u + v * v + w * w) - r * (u * ux + v * vx + w * wx));
+//        double py = (kapa - 1) * (Ey - 0.5 * ry * (u * u + v * v + w * w) - r * (u * uy + v * vy + w * wy));
+//        double pz = (kapa - 1) * (Ez - 0.5 * rz * (u * u + v * v + w * w) - r * (u * uz + v * vz + w * wz));
+//        double prx = (r * px - p * rx) / (r * r);
+//        double pry = (r * py - p * ry) / (r * r);
+//        double prz = (r * pz - p * rz) / (r * r);
+//
+//        double vt = W[5] / r;
+//        double vtx = 1 / r * (dW[5] - rx * vt);
+//        double vty = 1 / r * (dW[nEqs + 5] - ry * vt);
+//        double vtz = 1 / r * (dW[2 * nEqs + 5] - rz * vt);
+//
+//        double Sxx = ux - 1.0 / 3 * (ux + vy + wz);
+//        double Syy = vy - 1.0 / 3 * (ux + vy + wz);
+//        double Szz = wz - 1.0 / 3 * (ux + vy + wz);
+//        double Sxy = 0.5 * (vx + uy);
+//        double Sxz = 0.5 * (wx + uz);
+//        double Syz = 0.5 * (wy + vz);
+//
+//        double txx = 2 * Sxx;
+//        double tyy = 2 * Syy;
+//        double tzz = 2 * Szz;
+//        double txy = 2 * Sxy;
+//        double txz = 2 * Sxz;
+//        double tyz = 2 * Syz;
+//
+//        // turbulence
+//        if (vt < 0) {
+//            vt = 0;
+//        }
+//
+//        double xi = r * vt; // vt/v
+//        double fv1 = xi * xi * xi / (xi * xi * xi + cv1 * cv1 * cv1);
+//        double mut = r * vt * fv1;
+//        double Txx = 2 * mut * Sxx;
+//        double Tyy = 2 * mut * Syy;
+//        double Tzz = 2 * mut * Szz;
+//        double Txy = 2 * mut * Sxy;
+//        double Txz = 2 * mut * Sxz;
+//        double Tyz = 2 * mut * Syz;
+//
+//        fvn[0] = 0;
+//        fvn[1] = 1 / Re * (txx + Txx) * n[0];
+//        fvn[2] = 1 / Re * (txy + Txy) * n[0];
+//        fvn[3] = 1 / Re * (txz + Txz) * n[0];
+//        fvn[4] = (1 / Re * (u * (txx + Txx) + v * (txy + Txy) + w * (txz + Txz) + kapa / (kapa - 1) * (1 / Pr + mut / Prt) * prx)) * n[0];
+//        fvn[5] = 1 / (Re * sigma) * (1 + r * vt) * vtx * n[0];
+//
+//        fvn[1] = fvn[1] + 1 / Re * (txy + Txy) * n[1];
+//        fvn[2] = fvn[2] + 1 / Re * (tyy + Tyy) * n[1];
+//        fvn[3] = fvn[3] + 1 / Re * (tyz + Tyz) * n[1];
+//        fvn[4] = fvn[4] + (1 / Re * (u * (txy + Txy) + v * (tyy + Tyy) + w * (tyz + Tyz) + kapa / (kapa - 1) * (1 / Pr + mut / Prt) * pry)) * n[1];
+//        fvn[5] = fvn[5] + 1 / (Re * sigma) * (1 + r * vt) * vty * n[1];
+//
+//        fvn[1] = fvn[1] + 1 / Re * (txz + Txz) * n[2];
+//        fvn[2] = fvn[2] + 1 / Re * (tyz + Tyz) * n[2];
+//        fvn[3] = fvn[3] + 1 / Re * (tzz + Tzz) * n[2];
+//        fvn[4] = fvn[4] + (1 / Re * (u * (txz + Txz) + v * (tyz + Tyz) + w * (tzz + Tzz) + kapa / (kapa - 1) * (1 / Pr + mut / Prt) * prz)) * n[2];
+//        fvn[5] = fvn[5] + 1 / (Re * sigma) * (1 + r * vt) * vtz * n[2];
+//        return fvn;
     }
 
     @Override
@@ -336,12 +392,7 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
                     WR[4] = p / (kapa - 1);
                     WR[5] = 0;
                 } else {
-                    WR[0] = WL[0];
-                    WR[1] = WL[1];
-                    WR[2] = WL[2];
-                    WR[3] = WL[3];
-                    WR[4] = WL[4];
-                    WR[5] = WL[5];
+                    System.arraycopy(WL, 0, WR, 0, nEqs);
                 }
                 break;
 
@@ -355,12 +406,7 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
                     WR[4] = p / (kapa - 1) + (WR[1] * WR[1] + WR[2] * WR[2] + WR[3] * WR[3]) / (2 * WR[0]) - WR[0] * Math.pow(Mat.L2Norm(Mat.cross(omega, elem.currentX)), 2) / 2;
                     WR[5] = 0;
                 } else {
-                    WR[0] = WL[0];
-                    WR[1] = WL[1];
-                    WR[2] = WL[2];
-                    WR[3] = WL[3];
-                    WR[4] = WL[4];
-                    WR[5] = WL[5];
+                    System.arraycopy(WL, 0, WR, 0, nEqs);
                 }
                 break;
 
@@ -374,12 +420,7 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
                     WR[4] = p / (kapa - 1) + (WR[1] * WR[1] + WR[2] * WR[2] + WR[3] * WR[3]) / (2 * WR[0]) - WR[0] * Math.pow(Mat.L2Norm(Mat.cross(omega, elem.currentX)), 2) / 2;
                     WR[5] = 0;
                 } else {
-                    WR[0] = WL[0];
-                    WR[1] = WL[1];
-                    WR[2] = WL[2];
-                    WR[3] = WL[3];
-                    WR[4] = WL[4];
-                    WR[5] = WL[5];
+                    System.arraycopy(WL, 0, WR, 0, nEqs);
                 }
                 break;
 
@@ -411,7 +452,7 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
                     double uinl = Vinl * Math.cos(attackAngleAlfa) * Math.cos(attackAngleBeta) + uRot[0];
                     double vinl = Vinl * Math.sin(attackAngleAlfa) * Math.cos(attackAngleBeta) + uRot[1];
                     double winl = Vinl * Math.sin(attackAngleAlfa) * Math.sin(attackAngleBeta) + uRot[2];
-                    double Einl = p / (kapa - 1) + 0.5 * Rinl * Vinl * Vinl - Rinl * Math.pow(Mat.L2Norm(Mat.cross(omega, elem.currentX)), 2) / 2;
+                    double Einl = p / (kapa - 1) + 0.5 * Rinl * Vinl * Vinl - 0*Rinl * Math.pow(Mat.L2Norm(Mat.cross(omega, elem.currentX)), 2) / 2;
                     WR[0] = Rinl;
                     WR[1] = Rinl * uinl;
                     WR[2] = Rinl * vinl;
@@ -452,13 +493,8 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
                 WR[5] = ro * vtOut;
                 break;
 
-            case (-4): // nevazka stena
-                WR[0] = WL[0];
-                WR[1] = WL[1];
-                WR[2] = WL[2];
-                WR[3] = WL[3];
-                WR[4] = WL[4];
-                WR[5] = WL[5];
+            case (BoundaryType.INVISCID_WALL): // nevazka stena
+                System.arraycopy(WL, 0, WR, 0, nEqs);
                 break;
         }
         return WR;
