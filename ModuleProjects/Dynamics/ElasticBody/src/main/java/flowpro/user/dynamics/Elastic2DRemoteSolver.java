@@ -1,7 +1,7 @@
 package flowpro.user.dynamics;
 
 import flowpro.api.*;
-import flowpro.user.dynamics.Elastic2DMatlabInterface.Body;
+import flowpro.user.dynamics.Elastic2DRemoteSolver.Body;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -11,11 +11,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-/**
- *
- * @author obublik
- */
-public class Elastic2DMatlabInterface implements Dynamics {
+
+public class Elastic2DRemoteSolver implements Dynamics {
 
 	Equation eqn;
 
@@ -328,7 +325,7 @@ class JsonRemoteStructureSolver implements RemoteStructureSolver {
 	public static int PORT = 5767;
 	public static final int TIME_OUT = 30000;
 
-	private Socket socket;
+	private final Socket socket;
 	private final DataOutputStream out;
 	private final DataInputStream in;
 
