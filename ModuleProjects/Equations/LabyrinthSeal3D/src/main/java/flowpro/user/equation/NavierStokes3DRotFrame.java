@@ -267,6 +267,14 @@ public class NavierStokes3DRotFrame implements Equation {
             Re = -1;  // temporarely
             Pr = -1;
         }
+        
+        System.out.println("---- notable physical parameters: ----");
+        System.out.printf("heat capacity ratio %.3f\n", kapa);
+        if (isDiffusive) {
+            System.out.printf("Reynolds number     %.3e\n", Re);
+            System.out.printf("Prandtl number      %.3f\n", Pr);
+        }
+        System.out.println("--------------------------------------");
     }
 
     @Override

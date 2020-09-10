@@ -121,9 +121,13 @@ public class IncompressibleNavierStokes implements Equation {
         switch (TT) {
             case (BoundaryType.WALL):
             case (BoundaryType.INVISCID_WALL):
-                f[0] = 0;
-                for (int d = 0; d < dim; ++d) {
-                    f[d + 1] = WL[0] * n[d];
+                double V = 0;
+                for (int d = 0; d < dim; d++) {
+                    V += elem.meshVelocity[d] * n[d];
+                }
+                f[0] = V;
+                for (int d = 0; d < dim; d++) {
+                    f[d + 1] += V * WR[d + 1] + WR[0] * n[d];
                 }
                 break;
             case (BoundaryType.INLET):
@@ -154,7 +158,7 @@ public class IncompressibleNavierStokes implements Equation {
                 double du = VnR - VnL;
                 double us = (VnL + VnR) / 2 - dp / alfa - beta / (2 * alfa) * du;
                 double ps = (WL[0] + WR[0]) / 2 - c2 / alfa * du + beta / (2 * alfa) * dp;
-                
+
                 // tangential velocity
                 double[] vt = new double[dim];
                 if (us > 0) {
@@ -166,7 +170,7 @@ public class IncompressibleNavierStokes implements Equation {
                         vt[d] = WR[d + 1] - VnR * n[d];
                     }
                 }
-                
+
                 Wstar[0] = ps;
                 for (int d = 0; d < dim; d++) {
                     Wstar[d + 1] = us * n[d] + vt[d];
@@ -255,29 +259,30 @@ public class IncompressibleNavierStokes implements Equation {
                 if (isDiffusive) {
                     double[] u = elem.meshVelocity;
                     WR[0] = WL[0];
-                    for (int d = 0; d < dim; ++d) {
-                        WR[d + 1] = WR[0] * u[d];
+                    for (int d = 0; d < dim; d++) {
+                        WR[d + 1] = u[d];
                     }
                 } else {
-                    WR = Arrays.copyOf(WL, nEqs);
+                    WR[0] = WL[0];
                     double nu = 0;
-                    for (int d = 0; d < dim; ++d) {
+                    for (int d = 0; d < dim; d++) {
                         nu += WL[d + 1] * n[d];
                     }
                     for (int d = 0; d < dim; ++d) { //tangent to wall
-                        WR[d + 1] = WL[d + 1] + n[d] * nu;
+                        WR[d + 1] = WL[d + 1] - n[d] * nu;
                     }
                 }
                 break;
             case (BoundaryType.INVISCID_WALL):
-                WR = Arrays.copyOf(WL, nEqs);
+                WR[0] = WL[0];
                 double nu = 0;
-                for (int d = 0; d < dim; ++d) {
+                for (int d = 0; d < dim; d++) {
                     nu += WL[d + 1] * n[d];
                 }
-                for (int d = 0; d < dim; ++d) { //tangent to wall
-                    WR[d + 1] = WL[d + 1] + n[d] * nu;
+                for (int d = 0; d < dim; d++) { //tangent to wall
+                    WR[d + 1] = WL[d + 1] - n[d] * nu;
                 }
+                
                 break;
 
             case (BoundaryType.INLET):
@@ -333,13 +338,13 @@ public class IncompressibleNavierStokes implements Equation {
     }
 
     @Override
-    public double[] combineShockSensors(double[] shock){
-        for(int m = 1; m < nEqs; m++){
+    public double[] combineShockSensors(double[] shock) {
+        for (int m = 1; m < nEqs; m++) {
             shock[m] = shock[0]; // all shock sensors are acording divergence
         }
         return shock;
     }
-    
+
     @Override
     public void saveReferenceValues(String filePath) throws IOException {
         FlowProProperties output = new FlowProProperties();
