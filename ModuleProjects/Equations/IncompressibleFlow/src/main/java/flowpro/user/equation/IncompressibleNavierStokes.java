@@ -29,6 +29,8 @@ public class IncompressibleNavierStokes implements Equation {
     protected double rhoRef;
     protected double velocityRef;
     protected double tRef;
+    protected double rho;
+    protected double eta;
 
     // inlet boundary condition
     protected boolean isInletSupersonic;
@@ -76,6 +78,15 @@ public class IncompressibleNavierStokes implements Equation {
         // reference values from inlet
         VIn = props.getDoubleArray("VIn");
 
+        // density
+        if (props.containsKey("density")){
+            rho = props.getDouble("density");
+        }
+        
+        if (props.containsKey("viscosity")){
+            eta = props.getDouble("viscosity");
+        }
+        
         // other reference values
         if (props.containsKey("lRef")) {
             lRef = props.getDouble("lRef");
@@ -89,7 +100,10 @@ public class IncompressibleNavierStokes implements Equation {
         }
         velocityRef = Math.sqrt(velocityRef);
         tRef = lRef / velocityRef;
-
+        
+        for (int d = 0; d < dim; ++d) {
+            VIn[d] /= velocityRef;
+        }
         // outlet
         if (props.containsKey("pOut")) {
             pOut = props.getDouble("pOut");
@@ -97,7 +111,13 @@ public class IncompressibleNavierStokes implements Equation {
             throw new IOException("outlet boundary pressure condition is not specified");
         }
 
-        Re = props.getDouble("reynolds");
+        if (props.containsKey("reynolds")){
+            Re = props.getDouble("reynolds");
+        } else {
+            Re = rho*velocityRef*lRef/eta;
+        }
+        
+        System.out.println("Reynolds number " + Re);
     }
 
     @Override
@@ -121,11 +141,23 @@ public class IncompressibleNavierStokes implements Equation {
         switch (TT) {
             case (BoundaryType.WALL):
             case (BoundaryType.INVISCID_WALL):
+                
                 f[0] = 0;
-                for (int d = 0; d < dim; ++d) {
-                    f[d + 1] = WL[0] * n[d];
+                for (int d = 0; d < dim; d++) {
+                    f[d + 1] = WR[0] * n[d];
+                }
+                
+                // for ALE
+                double V = 0;
+                for (int d = 0; d < dim; d++) {
+                    V += elem.meshVelocity[d] * n[d];
+                }
+                f[0] += V;
+                for (int d = 0; d < dim; d++) {
+                    f[d + 1] += V * WR[d + 1];
                 }
                 break;
+
             case (BoundaryType.INLET):
             case (BoundaryType.OUTLET):
                 f = convectiveFlux(WR, n, elem);
@@ -154,7 +186,7 @@ public class IncompressibleNavierStokes implements Equation {
                 double du = VnR - VnL;
                 double us = (VnL + VnR) / 2 - dp / alfa - beta / (2 * alfa) * du;
                 double ps = (WL[0] + WR[0]) / 2 - c2 / alfa * du + beta / (2 * alfa) * dp;
-                
+
                 // tangential velocity
                 double[] vt = new double[dim];
                 if (us > 0) {
@@ -166,7 +198,7 @@ public class IncompressibleNavierStokes implements Equation {
                         vt[d] = WR[d + 1] - VnR * n[d];
                     }
                 }
-                
+
                 Wstar[0] = ps;
                 for (int d = 0; d < dim; d++) {
                     Wstar[d + 1] = us * n[d] + vt[d];
@@ -255,28 +287,28 @@ public class IncompressibleNavierStokes implements Equation {
                 if (isDiffusive) {
                     double[] u = elem.meshVelocity;
                     WR[0] = WL[0];
-                    for (int d = 0; d < dim; ++d) {
-                        WR[d + 1] = WR[0] * u[d];
+                    for (int d = 0; d < dim; d++) {
+                        WR[d + 1] = u[d];
                     }
                 } else {
-                    WR = Arrays.copyOf(WL, nEqs);
+                    WR[0] = WL[0];
                     double nu = 0;
-                    for (int d = 0; d < dim; ++d) {
+                    for (int d = 0; d < dim; d++) {
                         nu += WL[d + 1] * n[d];
                     }
                     for (int d = 0; d < dim; ++d) { //tangent to wall
-                        WR[d + 1] = WL[d + 1] + n[d] * nu;
+                        WR[d + 1] = WL[d + 1] - n[d] * nu;
                     }
                 }
                 break;
             case (BoundaryType.INVISCID_WALL):
-                WR = Arrays.copyOf(WL, nEqs);
+                WR[0] = WL[0];
                 double nu = 0;
-                for (int d = 0; d < dim; ++d) {
+                for (int d = 0; d < dim; d++) {
                     nu += WL[d + 1] * n[d];
                 }
-                for (int d = 0; d < dim; ++d) { //tangent to wall
-                    WR[d + 1] = WL[d + 1] + n[d] * nu;
+                for (int d = 0; d < dim; d++) { //tangent to wall
+                    WR[d + 1] = WL[d + 1] - n[d] * nu;
                 }
                 break;
 
@@ -299,7 +331,7 @@ public class IncompressibleNavierStokes implements Equation {
 
     @Override
     public double pressure(double[] W) {
-        return 1;
+        return W[0];
     }
 
     @Override
@@ -333,13 +365,13 @@ public class IncompressibleNavierStokes implements Equation {
     }
 
     @Override
-    public double[] combineShockSensors(double[] shock){
-        for(int m = 1; m < nEqs; m++){
+    public double[] combineShockSensors(double[] shock) {
+        for (int m = 1; m < nEqs; m++) {
             shock[m] = shock[0]; // all shock sensors are acording divergence
         }
         return shock;
     }
-    
+
     @Override
     public void saveReferenceValues(String filePath) throws IOException {
         FlowProProperties output = new FlowProProperties();
@@ -347,20 +379,21 @@ public class IncompressibleNavierStokes implements Equation {
         output.setProperty("l", Double.toString(lRef));
         output.setProperty("v", Double.toString(velocityRef));
         output.setProperty("t", Double.toString(tRef));
+        output.setProperty("rho", Double.toString(rho));
 
         output.store(new FileOutputStream(filePath), null);
     }
 
     @Override
     public double[] getReferenceValues() {
-        return new double[]{lRef, velocityRef, tRef};
+        return new double[]{lRef, velocityRef, tRef, rho};
     }
 
     @Override
     public double[] getResults(double[] W, double[] dW, double[] X, String name) {
         switch (name) {
             case "pressure":
-                return new double[]{W[0]};
+                return new double[]{rho*W[0]};
 
             case "xVelocity":
                 return new double[]{velocityRef * W[1]};
