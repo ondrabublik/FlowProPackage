@@ -431,6 +431,18 @@ public class IncompressibleNavierStokesSpalartAllmaras implements Equation {
     }
 
     @Override
+	public double[] normalStress(double[] W, double[] dW, double[] normal) {	
+		double p = pressure(W);
+		
+		double[] normalStress = new double[dim];
+		for (int d = 0; d < dim; ++d) {
+			normalStress[d] -= p * normal[d];
+		}
+		
+		return normalStress;
+	}
+    
+    @Override
     public double maxEigenvalue(double[] W, ElementData elem) {
         limite(W);
         double u = Math.sqrt(W[1] * W[1] + W[2] * W[2]);

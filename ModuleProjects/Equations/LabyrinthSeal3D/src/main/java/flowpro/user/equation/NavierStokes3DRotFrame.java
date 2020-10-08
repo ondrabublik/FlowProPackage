@@ -569,6 +569,18 @@ public class NavierStokes3DRotFrame implements Equation {
     }
 
     @Override
+	public double[] normalStress(double[] W, double[] dW, double[] normal) {	
+		double p = pressure(W);
+		
+		double[] normalStress = new double[dim];
+		for (int d = 0; d < dim; ++d) {
+			normalStress[d] -= p * normal[d];
+		}
+		
+		return normalStress;
+	}
+    
+    @Override
     public double maxEigenvalue(double[] W, ElementData elem) {
         W[0] = limiteRho(W[0]);
         double p = pressure(W);
