@@ -431,7 +431,7 @@ public class IncompressibleNavierStokesSpalartAllmaras implements Equation {
     }
 
     @Override
-	public double[] normalStress(double[] W, double[] dW, double[] normal) {	
+	public double[] stressVector(double[] W, double[] dW, double[] normal) {	
 		double p = pressure(W);
 		
 		double[] normalStress = new double[dim];

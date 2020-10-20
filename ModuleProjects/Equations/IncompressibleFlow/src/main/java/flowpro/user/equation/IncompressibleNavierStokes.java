@@ -16,7 +16,7 @@ public class IncompressibleNavierStokes implements Equation {
         static final int OUTLET = -3;
         static final int INVISCID_WALL = -4;
     }
-
+		
     protected int dim;
     protected int nEqs;
     protected boolean isDiffusive;
@@ -169,6 +169,7 @@ public class IncompressibleNavierStokes implements Equation {
 //                double maxEigenValue = Math.max(maxEigenvalue(WL, elem), maxEigenvalue(WR, elem));
 //                for (int j = 0; j < nEqs; j++) {
 //                    f[j] = (fL[j] + fR[j] - maxEigenValue * (WR[j] - WL[j])) / 2;
+////					f[j] = (fL[j] + fR[j]) / 2;
 //                }
 
                 double c2 = 1000;
@@ -233,22 +234,7 @@ public class IncompressibleNavierStokes implements Equation {
 
     @Override
     public double[] diffusiveFlux(double[] W, double[] dW, double[] n, ElementData elem) {
-
-        double[] velocityJac = new double[dim * dim];
-        for (int d = 0; d < dim; ++d) {
-            for (int f = 0; f < dim; ++f) {
-                velocityJac[dim * d + f] = dW[f * nEqs + d + 1];
-            }
-        }
-
-        // stress tensor calculation
-        double[] stress = new double[dim * dim];
-        for (int d = 0; d < dim; ++d) {
-            for (int f = 0; f < dim; ++f) {
-                stress[dim * d + f] = (velocityJac[dim * d + f] + velocityJac[dim * f + d]) / 2;
-            }
-        }
-
+        double[] stress = viscousStressTensor(W, dW);
         double[] flux = new double[nEqs];
         flux[0] = 0;
         for (int d = 0; d < dim; ++d) {
@@ -287,9 +273,7 @@ public class IncompressibleNavierStokes implements Equation {
                 if (isDiffusive) {
                     double[] u = elem.meshVelocity;
                     WR[0] = WL[0];
-                    for (int d = 0; d < dim; d++) {
-                        WR[d + 1] = u[d];
-                    }
+					System.arraycopy(u, 0, WR, 1, dim);
                 } else {
                     WR[0] = WL[0];
                     double nu = 0;
@@ -313,10 +297,13 @@ public class IncompressibleNavierStokes implements Equation {
                 break;
 
             case (BoundaryType.INLET):
-                WR[0] = WL[0];
+                WR[0] = WL[0];				
                 for (int d = 0; d < dim; ++d) {
                     WR[d + 1] = VIn[d];
                 }
+//				double height = 0.41;
+//				double y = elem.currentX[1];
+//				WR[1] = 1.5 * y * (height-y) / (height*height/4);
                 break;
 
             case (BoundaryType.OUTLET):
@@ -333,22 +320,44 @@ public class IncompressibleNavierStokes implements Equation {
     public double pressure(double[] W) {
         return W[0];
     }
+	
+	protected double[] viscousStressTensor(double[] W, double[] dW) {
+		double[] velocityJac = new double[dim * dim];
+        for (int d = 0; d < dim; ++d) {
+            for (int f = 0; f < dim; ++f) {
+                velocityJac[dim * d + f] = dW[f * nEqs + d + 1];
+            }
+        }
+
+        // stress tensor calculation
+        double[] stress = new double[dim * dim];
+        for (int d = 0; d < dim; ++d) {
+            for (int f = 0; f < dim; ++f) {
+                stress[dim * d + f] = (velocityJac[dim * d + f] + velocityJac[dim * f + d]);
+            }
+        }
+		
+		return stress;
+	}
 
     @Override
-	public double[] normalStress(double[] W, double[] dW, double[] normal) {	
+	public double[] stressVector(double[] W, double[] dW, double[] normal) {	
 		double p = pressure(W);
-		
-		double[] normalStress = new double[dim];
+		double[] viscousStress = viscousStressTensor(W, dW);
+		double[] stressVector = new double[dim];
 		for (int d = 0; d < dim; ++d) {
-			normalStress[d] -= p * normal[d];
-		}
+			stressVector[d] -= p * normal[d];
+			for (int f = 0; f < dim; ++f) {
+				stressVector[d] += 1 / Re * viscousStress[d * dim + f] * normal[f];
+			}
+		}		
 		
-		return normalStress;
+		return stressVector;
 	}
     
     @Override
     public double maxEigenvalue(double[] W, ElementData elem) {
-        limite(W);
+//        limite(W);
         double u = Math.sqrt(W[1] * W[1] + W[2] * W[2]);
         return u;
     }
@@ -368,8 +377,8 @@ public class IncompressibleNavierStokes implements Equation {
         throw new UnsupportedOperationException("operation not supported");
     }
 
-    void limite(double[] W) {
-    }
+//    void limite(double[] W) {
+//    }
 
     @Override
     public boolean isIPFace(int TT) {
