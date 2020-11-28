@@ -89,6 +89,8 @@ public class Elastic3DBeam implements Dynamics {
             System.out.println("Matlab init error " + e);
         }
     }
+	
+	public void computeBodyMove(double dt, double t, int newtonIter, FluidForces[] fluFor) {} // jenom abych mohl prelozit kod
 
     public void computeBodyMove(double dt, double t, int newtonIter, FluidForces fluFor) {
         this.dt = dt;

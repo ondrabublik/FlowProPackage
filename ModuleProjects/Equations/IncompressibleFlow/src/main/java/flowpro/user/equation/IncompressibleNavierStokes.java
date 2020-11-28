@@ -298,12 +298,12 @@ public class IncompressibleNavierStokes implements Equation {
 
             case (BoundaryType.INLET):
                 WR[0] = WL[0];				
-                for (int d = 0; d < dim; ++d) {
-                    WR[d + 1] = VIn[d];
-                }
-//				double height = 0.41;
-//				double y = elem.currentX[1];
-//				WR[1] = 1.5 * y * (height-y) / (height*height/4);
+//                for (int d = 0; d < dim; ++d) {
+//                    WR[d + 1] = VIn[d];
+//                }
+				double height = 0.41;
+				double y = elem.currentX[1];
+				WR[1] = 1.5 * y * (height-y) / (height*height/4);
                 break;
 
             case (BoundaryType.OUTLET):

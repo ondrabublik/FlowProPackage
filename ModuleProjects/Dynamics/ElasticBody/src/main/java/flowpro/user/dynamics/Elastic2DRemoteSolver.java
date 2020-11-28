@@ -14,16 +14,18 @@ import org.json.JSONObject;
 
 public class Elastic2DRemoteSolver implements Dynamics {
 
-	Equation eqn;
+//	private Equation eqn;
 
 	private int nBodies;
 	private Body[] bodies;
+	
 	public double dt;
 	public double t;
 	public double zLength;
 	public double tKick;
 	
-//	private String simulationPath;
+	private FluidForces[] fluFor;	
+	private File resultsFile;
 	
 	RemoteStructureSolver remoteStructureSolver;
 
@@ -44,49 +46,49 @@ public class Elastic2DRemoteSolver implements Dynamics {
 
 	@Override
 	public void init(int nBodies, String simulationPath, String meshPath, Equation eqn) throws IOException {
-//		this.simulationPath = simulationPath;
-		this.eqn = eqn;
+		resultsFile = new File(simulationPath + "bodiesDynamic2.txt");
+		resultsFile.createNewFile();
+		
+//		this.eqn = eqn;
 		this.nBodies = nBodies;
 		bodies = new Body[nBodies];
 		for (int i = 0; i < nBodies; i++) {
-			bodies[i] = new Body(i);
-		}
-
-		// clear file for results
-		FlowProProperties props = new FlowProProperties();
-		props.load(new FileInputStream(simulationPath + "parameters.txt"));
+			bodies[i] = new Body();
+		}		
 
 		// read boundary points
-		try {
-			double[][] PXY = Mat.loadDoubleMatrix(meshPath + "vertices.txt"); // mesh vertices coordinates
-			int[][] boundaryALE = Mat.loadIntMatrix(meshPath + "boundaryTypeALE.txt");
-			for (int k = 0; k < nBodies; k++) {
-				int[] aux = new int[PXY.length];
-				for (int i = 0; i < boundaryALE.length; i++) {
-					if (boundaryALE[i][0] == k + 2) {
-						aux[boundaryALE[i][1]] = 1;
-						aux[boundaryALE[i][2]] = 1;
-					}
-				}
-				int s = 0;
-				for (int i = 0; i < aux.length; i++) {
-					s += aux[i];
-				}
-				bodies[k].nBoundary = s;
-				bodies[k].radialBasisCoefficients = null;
-				bodies[k].boundaryPointsCoords = new double[bodies[k].nBoundary][2];
-				s = 0;
-				for (int i = 0; i < aux.length; i++) {
-					if (aux[i] == 1) {
-						bodies[k].boundaryPointsCoords[s] = PXY[i];
-						s++;
-					}
+		double[][] PXY = Mat.loadDoubleMatrix(meshPath + "vertices.txt"); // mesh vertices coordinates
+		int[][] boundaryALE = Mat.loadIntMatrix(meshPath + "boundaryTypeALE.txt");
+		
+		for (int k = 0; k < nBodies; k++) {
+			int[] aux = new int[PXY.length];
+			for (int i = 0; i < boundaryALE.length; i++) {
+				if (boundaryALE[i][0] == k + 2) {
+					aux[boundaryALE[i][1]] = 1;
+					aux[boundaryALE[i][2]] = 1;
 				}
 			}
-		} catch (IOException ex) {
-			System.out.println("error while reading boundary points" + ex);
-			throw ex;
+			int s = 0;
+			for (int i = 0; i < aux.length; i++) {
+				s += aux[i];
+			}
+			bodies[k].nBoundary = s;
+			bodies[k].radialBasisCoefficients = null;
+			bodies[k].boundaryPointsCoords = new double[bodies[k].nBoundary][2];
+			s = 0;
+			for (int i = 0; i < aux.length; i++) {
+				if (aux[i] == 1) {
+					bodies[k].boundaryPointsCoords[s] = PXY[i];
+					s++;
+				}
+			}
 		}
+		
+		
+		// clear file for results
+		String parameterFilePath = simulationPath + "parameters.txt";
+		FlowProProperties props = new FlowProProperties();
+		props.load(parameterFilePath);
 
 		zLength = 1;
 		if (props.containsKey("zLength")) {
@@ -94,11 +96,17 @@ public class Elastic2DRemoteSolver implements Dynamics {
 		} else {
 			System.out.println("length of 2D bodies in z coordinate is set to " + zLength);
 		}
-
+		
 		tKick = Double.MAX_VALUE;
 		if (props.containsKey("tKick")) {
 			tKick = props.getDouble("tKick");
 		}
+		
+		int port = 5767;
+		if (props.containsKey("remoteStructureSolverPort")) {
+			port = props.getInt("remoteStructureSolverPort");
+		}
+		System.out.println("using port " + port);
 
 //		try {
 //			double[] refValues = eqn.getReferenceValues();
@@ -118,60 +126,77 @@ public class Elastic2DRemoteSolver implements Dynamics {
 
 //		dynamicComputation = true;
 
-		// Launching Matlab
-//		try {
+		try {
 			System.out.println("lauching remote structure solver");
 //            mc = new MatlabClient();
-			remoteStructureSolver = new JsonRemoteStructureSolver();
-			remoteStructureSolver.init();
-//		} catch (IOException e) {
-//			System.out.println("Matlab init error " + e);			
-//		}
+			remoteStructureSolver = new JsonRemoteStructureSolver(port);
+			remoteStructureSolver.connect();
+		} catch (IOException ex) {
+			throw new IOException("error while connecting to remote structure solver: " + ex.getMessage(), ex);			
+		}
 	}
-
+	
 	@Override
-	public void computeBodyMove(double dt, double t, int newtonIter, FluidForces fluFor) throws IOException {
+	public void computeBodyMove(double dt, double t, int newtonIter, FluidForces[] fluFor) throws IOException {
+		this.fluFor = fluFor;
 		this.dt = dt;
 		this.t = t;
 
-		double[][] boundaryForces = fluFor.getBoundaryForce();
-		if (boundaryForces != null) {
-			int[][] boundaryIndexes = fluFor.getFaceIndexes();
-			int nIndex = boundaryForces.length;
-			int dim = boundaryForces[0].length / 2;
-			int[] nbIndex = new int[nBodies];
+		for (int k = 0; k < nBodies; k++) {
+			double[][] stressVectors = Mat.transpose(fluFor[k].stressVectors);
+			double[][] positions = fluFor[k].stressVectorPositions;
 
-			// number of bodies faces
-			for (int i = 0; i < nIndex; i++) {
-				nbIndex[boundaryIndexes[i][2] - 2]++;
-			}
-			for (int k = 0; k < nBodies; k++) {
-				double[][] bodyForce = new double[dim][nbIndex[k]];
-				double[][] forceCoord = new double[nbIndex[k]][dim];
-				int s = 0;
-				for (int i = 0; i < nIndex; i++) {
-					if (boundaryIndexes[i][2] == k + 2) {
-						for (int j = 0; j < dim; j++) {
-							bodyForce[j][i] = boundaryForces[s][j];
-							forceCoord[i][j] = boundaryForces[s][j + dim];
-						}
-						s++;
-					}
-				}				
-//				mc.computeDeformation(k, bodies[k], forceCoord, bodyForce, t, dt);
-				double[][] rbfForceCoefficient = computeRadialBasisFunctionCoefficients(forceCoord, bodyForce);
-				remoteStructureSolver.computeDeformation(newtonIter, k, bodies[k], forceCoord, rbfForceCoefficient,
-						bodyForce, t, dt);
+			double[][] rbfForceCoefficient = computeRadialBasisFunctionCoefficients(positions, stressVectors);
+			remoteStructureSolver.computeDeformation(newtonIter, k, bodies[k], positions, rbfForceCoefficient,
+					stressVectors, t, dt);
 
-				bodies[k].radialBasisCoefficients = computeRadialBasisFunctionCoefficients(bodies[k].boundaryPointsCoords, bodies[k].bodyDeformation);
-			}
-		} else { // external force free
-			for (int k = 0; k < nBodies; k++) {
-				remoteStructureSolver.computeDeformation(newtonIter, k, bodies[k], null, null, null, t, dt);
-				bodies[k].radialBasisCoefficients = computeRadialBasisFunctionCoefficients(bodies[k].boundaryPointsCoords, bodies[k].bodyDeformation);
-			}
+			bodies[k].radialBasisCoefficients = computeRadialBasisFunctionCoefficients(bodies[k].boundaryPointsCoords, bodies[k].bodyDeformation);
 		}
 	}
+
+//	@Override
+//	public void computeBodyMove(double dt, double t, int newtonIter, FluidForces fluFor) throws IOException {
+//		this.dt = dt;
+//		this.t = t;
+//
+//		double[][] boundaryForces = fluFor.getBoundaryForce();
+//		if (boundaryForces != null) {
+//			int[][] boundaryIndexes = fluFor.getFaceIndexes();
+//			int nIndex = boundaryForces.length;
+//			int dim = boundaryForces[0].length / 2;
+//			int[] nbIndex = new int[nBodies];
+//
+//			// number of bodies faces
+//			for (int i = 0; i < nIndex; i++) {
+//				nbIndex[boundaryIndexes[i][2] - 2]++;
+//			}
+//			for (int k = 0; k < nBodies; k++) {
+//				double[][] bodyForce = new double[dim][nbIndex[k]];
+//				double[][] forceCoord = new double[nbIndex[k]][dim];
+//				int s = 0;
+//				for (int i = 0; i < nIndex; i++) {
+//					if (boundaryIndexes[i][2] == k + 2) {
+//						for (int j = 0; j < dim; j++) {
+//							bodyForce[j][i] = boundaryForces[s][j];
+//							forceCoord[i][j] = boundaryForces[s][j + dim];
+//						}
+//						s++;
+//					}
+//				}				
+////				mc.computeDeformation(k, bodies[k], forceCoord, bodyForce, t, dt);
+//				double[][] rbfForceCoefficient = computeRadialBasisFunctionCoefficients(forceCoord, bodyForce);
+//				remoteStructureSolver.computeDeformation(newtonIter, k, bodies[k], forceCoord, rbfForceCoefficient,
+//						bodyForce, t, dt);
+//
+//				bodies[k].radialBasisCoefficients = computeRadialBasisFunctionCoefficients(bodies[k].boundaryPointsCoords, bodies[k].bodyDeformation);
+//			}
+//		} else { // external force free
+//			for (int k = 0; k < nBodies; k++) {
+//				remoteStructureSolver.computeDeformation(newtonIter, k, bodies[k], null, null, null, t, dt);
+//				bodies[k].radialBasisCoefficients = computeRadialBasisFunctionCoefficients(bodies[k].boundaryPointsCoords, bodies[k].bodyDeformation);
+//			}
+//		}
+//	}
 
 	@Override
 	public MeshMove[] getMeshMove() {
@@ -193,15 +218,17 @@ public class Elastic2DRemoteSolver implements Dynamics {
 	}
 
 	@Override
-	public void savePositionsAndForces() throws IOException {
-//		try (BufferedWriter writer = new BufferedWriter(new FileWriter(simulationPath + "bodiesDynamic.txt"))) {
-//			for (Body body : bodies) {
-//				body.radialBasisCoefficients[0]
-//				
-//				writer.write(Integer.toString(entry));
-//				writer.newLine();
-//			}
-//        }
+	public void savePositionsAndForces() throws IOException {		
+		try (BufferedWriter writer = new BufferedWriter(new FileWriter(resultsFile, true))) {
+			writer.write(t + " 0 0 0");
+			for (FluidForces forces : fluFor) {
+				for (int d = 0; d < 2; d++) {
+					writer.write(" " + forces.force[d]);
+				}
+				writer.write(" 0");
+			}				
+			writer.newLine();
+        }
 	}
 
 	private double[][] computeRadialBasisFunctionCoefficients(double[][] boundaryPointsCoords, double[][] b) {
@@ -237,9 +264,6 @@ public class Elastic2DRemoteSolver implements Dynamics {
 		public double[][] boundaryPointsCoords;
 		public double[][] bodyDeformation;
 
-		Body(int i) {
-		}
-
 		public double[][] getBoundaryPointsCoords() {
 			return boundaryPointsCoords;
 		}
@@ -252,7 +276,9 @@ public class Elastic2DRemoteSolver implements Dynamics {
 
 interface RemoteStructureSolver {
 
-	public void init() throws IOException;
+//	public void init(int port) throws IOException, ClassNotFoundException ;
+	
+	public void connect() throws IOException;
 
 	public void computeDeformation(int newtonInter, int bodyNumber, Body body, double[][] stressCoords,
 			double[][] stressRBFCoefficient, double[][] stressVectors, double t, double dt) throws IOException;
@@ -268,8 +294,8 @@ class MatlabClient implements RemoteStructureSolver {
 	ObjectOutputStream out;
 	ObjectInputStream in;
 
-	MatlabClient() throws IOException, ClassNotFoundException {
-		try (ServerSocket listener = new ServerSocket(5767)) {
+	MatlabClient(int port) throws IOException, ClassNotFoundException {
+		try (ServerSocket listener = new ServerSocket(port)) {
 			socket = listener.accept();
 			socket.setTcpNoDelay(true);
 			socket.setKeepAlive(true);
@@ -281,10 +307,10 @@ class MatlabClient implements RemoteStructureSolver {
 			assert testMsg.equals("OK");
 			System.out.println("succesfully connected to Matlab ...");
 		}
-	}
+	}		
 
 	@Override
-	public void init() throws IOException {
+	public void connect() throws IOException {
 		try {
 			out.writeObject("init");
 			out.flush();
@@ -337,16 +363,15 @@ class MatlabClient implements RemoteStructureSolver {
 class JsonRemoteStructureSolver implements RemoteStructureSolver {
 
 	public static String HOSTNAME = "localhost";
-	public static int PORT = 5767;
 	public static final int TIME_OUT = 30000;
 
 	private final Socket socket;
 	private final DataOutputStream out;
 	private final DataInputStream in;
 
-	JsonRemoteStructureSolver() throws IOException {
+	JsonRemoteStructureSolver(int port) throws IOException {
 		socket = new Socket();
-		SocketAddress addr = new InetSocketAddress(HOSTNAME, PORT);
+		SocketAddress addr = new InetSocketAddress(HOSTNAME, port);
 		socket.connect(addr, TIME_OUT);
 
 		out = new DataOutputStream(socket.getOutputStream());
@@ -362,7 +387,7 @@ class JsonRemoteStructureSolver implements RemoteStructureSolver {
 	}
 
 	@Override
-	public void init() throws IOException {
+	public void connect() throws IOException {
 		try {
 			JSONObject json = new JSONObject();
 			json.put("tag", "init");
