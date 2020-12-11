@@ -31,11 +31,11 @@ public class Elastic2DRemoteSolver implements Dynamics {
 
 	// dynamic
 //	private boolean dynamicComputation = false;
-//	protected double lRef = 1;
-//	protected double pRef = 1;
-//	protected double rhoRef = 1;
-//	protected double vRef = 1;
-//	protected double tRef = 1;
+	protected double lRef;
+	protected double pRef;
+	protected double rhoRef;
+	protected double vRef;
+	protected double tRef;
 //	protected double mRef;
 //	protected double IRef;
 //	protected double kRef;
@@ -47,7 +47,7 @@ public class Elastic2DRemoteSolver implements Dynamics {
 	@Override
 	public void init(int nBodies, String simulationPath, String meshPath, Equation eqn) throws IOException {
 		resultsFile = new File(simulationPath + "bodiesDynamic2.txt");
-		resultsFile.createNewFile();
+		resultsFile.delete();
 		
 //		this.eqn = eqn;
 		this.nBodies = nBodies;
@@ -72,13 +72,13 @@ public class Elastic2DRemoteSolver implements Dynamics {
 			for (int i = 0; i < aux.length; i++) {
 				s += aux[i];
 			}
-			bodies[k].nBoundary = s;
+			bodies[k].nBoundaryPoints = s;
 			bodies[k].radialBasisCoefficients = null;
-			bodies[k].boundaryPointsCoords = new double[bodies[k].nBoundary][2];
+			bodies[k].boundaryPoints = new double[bodies[k].nBoundaryPoints][2];
 			s = 0;
 			for (int i = 0; i < aux.length; i++) {
 				if (aux[i] == 1) {
-					bodies[k].boundaryPointsCoords[s] = PXY[i];
+					bodies[k].boundaryPoints[s] = PXY[i];
 					s++;
 				}
 			}
@@ -108,15 +108,15 @@ public class Elastic2DRemoteSolver implements Dynamics {
 		}
 		System.out.println("using port " + port);
 
-//		try {
-//			double[] refValues = eqn.getReferenceValues();
-//			lRef = refValues[0];
-//			pRef = refValues[1];
-//			rhoRef = refValues[2];
-//			tRef = refValues[4];
-//		} catch (Exception e) {
-//			System.out.println("Cannot assign referential values to body dynamics!");
-//		}
+		try {
+			double[] refValues = eqn.getReferenceValues();
+			lRef = refValues[0];
+			pRef = refValues[1];
+			rhoRef = refValues[2];
+			tRef = refValues[4];
+		} catch (Exception ex) {
+			throw new IOException("error while reading reference values", ex);
+		}
 //		mRef = rhoRef * lRef * lRef;
 //		kRef = pRef;
 //		bRef = pRef * tRef;
@@ -142,15 +142,19 @@ public class Elastic2DRemoteSolver implements Dynamics {
 		this.dt = dt;
 		this.t = t;
 
-		for (int k = 0; k < nBodies; k++) {
-			double[][] stressVectors = Mat.transpose(fluFor[k].stressVectors);
-			double[][] positions = fluFor[k].stressVectorPositions;
+		for (int b = 0; b < nBodies; b++) {
+			double[][] points = Mat.times(fluFor[b].stressVectorPositions, lRef);
+			double[][] stressVectors = Mat.times(fluFor[b].stressVectors, pRef);
+			double[][] stressTensors = Mat.times(fluFor[b].stressTensors, pRef);
+			
+			double[][] rbfForceCoefficient = computeRadialBasisFunctionCoefficients(points,
+					Mat.transpose(stressVectors));
+			
+			remoteStructureSolver.computeDeformation(newtonIter, b, bodies[b], points,
+					rbfForceCoefficient, stressVectors, stressTensors, t * tRef, dt * tRef);
 
-			double[][] rbfForceCoefficient = computeRadialBasisFunctionCoefficients(positions, stressVectors);
-			remoteStructureSolver.computeDeformation(newtonIter, k, bodies[k], positions, rbfForceCoefficient,
-					stressVectors, t, dt);
-
-			bodies[k].radialBasisCoefficients = computeRadialBasisFunctionCoefficients(bodies[k].boundaryPointsCoords, bodies[k].bodyDeformation);
+			bodies[b].radialBasisCoefficients = computeRadialBasisFunctionCoefficients(bodies[b].boundaryPoints,
+					bodies[b].boundaryDisplacement);
 		}
 	}
 
@@ -202,7 +206,8 @@ public class Elastic2DRemoteSolver implements Dynamics {
 	public MeshMove[] getMeshMove() {
 		MeshMove[] mshMov = new MeshMove[nBodies];
 		for (int k = 0; k < nBodies; k++) {
-			mshMov[k] = new MeshMove(new double[]{0, 0}, new double[]{0}, bodies[k].getRadialBasisCoefficients(), bodies[k].getBoundaryPointsCoords());
+			mshMov[k] = new MeshMove(new double[]{0, 0}, new double[]{0}, bodies[k].getRadialBasisCoefficients(),
+					bodies[k].getBoundaryPoints());
 		}
 		return mshMov;
 	}
@@ -219,15 +224,15 @@ public class Elastic2DRemoteSolver implements Dynamics {
 
 	@Override
 	public void savePositionsAndForces() throws IOException {		
-		try (BufferedWriter writer = new BufferedWriter(new FileWriter(resultsFile, true))) {
-			writer.write(t + " 0 0 0");
+		try (PrintWriter writer = new PrintWriter(new BufferedWriter(new FileWriter(resultsFile, true)))) {
+			writer.format("%.15e 0 0 0 ", t * tRef);
 			for (FluidForces forces : fluFor) {
 				for (int d = 0; d < 2; d++) {
-					writer.write(" " + forces.force[d]);
+					writer.format("%.15e ", forces.force[d] * pRef * lRef * lRef);
 				}
-				writer.write(" 0");
+				writer.print("0");
 			}				
-			writer.newLine();
+			writer.print('\n');
         }
 	}
 
@@ -259,13 +264,13 @@ public class Elastic2DRemoteSolver implements Dynamics {
 	public class Body {
 
 		// deformation
-		public int nBoundary;
+		public int nBoundaryPoints;
 		public double[][] radialBasisCoefficients;
-		public double[][] boundaryPointsCoords;
-		public double[][] bodyDeformation;
+		public double[][] boundaryPoints;
+		public double[][] boundaryDisplacement;
 
-		public double[][] getBoundaryPointsCoords() {
-			return boundaryPointsCoords;
+		public double[][] getBoundaryPoints() {
+			return boundaryPoints;
 		}
 
 		public double[][] getRadialBasisCoefficients() {
@@ -281,7 +286,8 @@ interface RemoteStructureSolver {
 	public void connect() throws IOException;
 
 	public void computeDeformation(int newtonInter, int bodyNumber, Body body, double[][] stressCoords,
-			double[][] stressRBFCoefficient, double[][] stressVectors, double t, double dt) throws IOException;
+			double[][] stressRBFCoefficient, double[][] stressVectors, double[][] stressTensors, double t,
+			double dt) throws IOException;
 
 	public void nextTimeLevel() throws IOException;
 
@@ -323,7 +329,7 @@ class MatlabClient implements RemoteStructureSolver {
 
 	@Override
 	public void computeDeformation(int newtonInter, int bodyNumber, Body body, double[][] stressCoords,
-			double[][] stressRBFCoefficient, double[][] stressVectors, double t, double dt) throws IOException {
+			double[][] stressRBFCoefficient, double[][] stressVectors, double[][] stressTensors, double t, double dt) throws IOException {
 		try {
 			out.writeObject("def");
 			out.flush();
@@ -333,8 +339,8 @@ class MatlabClient implements RemoteStructureSolver {
 			out.writeDouble(t);
 			out.writeDouble(dt);
 			out.flush();
-			body.boundaryPointsCoords = (double[][]) in.readObject();
-			body.bodyDeformation = (double[][]) in.readObject();
+			body.boundaryPoints = (double[][]) in.readObject();
+			body.boundaryDisplacement = (double[][]) in.readObject();
 			Object o = in.readObject();
 			System.out.println("received: " + o);
 		} catch (ClassNotFoundException ex) {
@@ -416,7 +422,7 @@ class JsonRemoteStructureSolver implements RemoteStructureSolver {
 
 	@Override
 	public void computeDeformation(int innerIter, int bodyNumber, Body body, double[][] stressCoords,
-			double[][] stressRBFCoefficient, double[][] stressVectors, double t, double dt) throws IOException {
+			double[][] stressRBFCoefficient, double[][] stressVectors, double[][] stressTensors, double t, double dt) throws IOException {
 		try {
 			JSONObject json = new JSONObject();
 			json.put("tag", "forces");
@@ -427,6 +433,7 @@ class JsonRemoteStructureSolver implements RemoteStructureSolver {
 			json.put("stressCoords", new JSONArray(stressCoords));
 			json.put("stressRBFCoeffs", new JSONArray(stressRBFCoefficient));
 			json.put("stressVectors", new JSONArray(stressVectors));
+			json.put("stressTensors", new JSONArray(stressTensors));
 
 			out.writeUTF(json.toString());
 			out.flush();
@@ -439,8 +446,8 @@ class JsonRemoteStructureSolver implements RemoteStructureSolver {
 						+ " was expected, instead got message with tag " + json.get("tag"));
 			}
 
-			body.boundaryPointsCoords = json2Matrix(json.getJSONArray("coordinates"));
-			body.bodyDeformation = json2Matrix(json.getJSONArray("displacement"));
+			body.boundaryPoints = json2Matrix(json.getJSONArray("coordinates"));
+			body.boundaryDisplacement = json2Matrix(json.getJSONArray("displacement"));
 
 		} catch (JSONException ex) {
 			throw new IOException("error occured during comunication with remote structure solver: " + ex.getMessage());
