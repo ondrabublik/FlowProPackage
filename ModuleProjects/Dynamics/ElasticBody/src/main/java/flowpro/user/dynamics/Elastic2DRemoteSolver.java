@@ -258,7 +258,7 @@ public class Elastic2DRemoteSolver implements Dynamics {
 			norm += (a[i] - b[i]) * (a[i] - b[i]);
 		}
 		norm = Math.sqrt(norm);
-		return 1 - norm;
+		return 1 - norm * norm * norm;
 	}
 
 	public class Body {
