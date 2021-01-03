@@ -207,7 +207,7 @@ public class Elastic2DRemoteSolver implements Dynamics {
 		MeshMove[] mshMov = new MeshMove[nBodies];
 		for (int k = 0; k < nBodies; k++) {
 			mshMov[k] = new MeshMove(new double[]{0, 0}, new double[]{0}, bodies[k].getRadialBasisCoefficients(),
-					bodies[k].getBoundaryPoints());
+					bodies[k].getBoundaryPoints(), bodies[k].boundaryDisplacement);
 		}
 		return mshMov;
 	}
@@ -236,14 +236,14 @@ public class Elastic2DRemoteSolver implements Dynamics {
         }
 	}
 
-	private double[][] computeRadialBasisFunctionCoefficients(double[][] boundaryPointsCoords, double[][] b) {
-		int nPoints = boundaryPointsCoords.length;
-		int dim = boundaryPointsCoords[0].length;
+	private double[][] computeRadialBasisFunctionCoefficients(double[][] points, double[][] b) {
+		int nPoints = points.length;
+		int dim = points[0].length;
 		double[][] rbfCoeff = new double[dim][nPoints];
 		double[][] A = new double[nPoints][nPoints];
 		for (int i = 0; i < nPoints; i++) {
 			for (int j = 0; j < nPoints; j++) {
-				A[i][j] = radialBasisFunction(boundaryPointsCoords[i], boundaryPointsCoords[j]);
+				A[i][j] = radialBasisFunction(points[i], points[j]);
 			}
 		}
 		for (int d = 0; d < dim; d++) {
