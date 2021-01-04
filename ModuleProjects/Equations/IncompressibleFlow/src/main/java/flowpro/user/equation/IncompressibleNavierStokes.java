@@ -152,7 +152,7 @@ public class IncompressibleNavierStokes implements Equation {
                 for (int d = 0; d < dim; d++) {
                     V += elem.meshVelocity[d] * n[d];
                 }
-                f[0] += V;
+                //f[0] += V;
                 for (int d = 0; d < dim; d++) {
                     f[d + 1] += V * WR[d + 1];
                 }
@@ -444,7 +444,7 @@ public class IncompressibleNavierStokes implements Equation {
             case "div":
                 double[] div = new double[1];
                 for (int i = 0; i < dim; i++) {
-                    div[0] = dW[nEqs * i + i + 1];
+                    div[0] += dW[nEqs * i + i + 1];
                 }
                 return div;
 
