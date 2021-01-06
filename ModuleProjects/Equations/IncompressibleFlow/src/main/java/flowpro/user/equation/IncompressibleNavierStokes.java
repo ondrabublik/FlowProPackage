@@ -234,26 +234,7 @@ public class IncompressibleNavierStokes implements Equation {
 
     @Override
     public double[] diffusiveFlux(double[] W, double[] dW, double[] n, ElementData elem) {
-<<<<<<< HEAD
-
-        double[] velocityJac = new double[dim * dim];
-        for (int d = 0; d < dim; ++d) {
-            for (int f = 0; f < dim; ++f) {
-                velocityJac[dim * d + f] = dW[f * nEqs + d + 1];
-            }
-        }
-
-        // stress tensor calculation
-        double[] stress = new double[dim * dim];
-        for (int d = 0; d < dim; ++d) {
-            for (int f = 0; f < dim; ++f) {
-                stress[dim * d + f] = velocityJac[dim * d + f] + velocityJac[dim * f + d];
-            }
-        }
-
-=======
         double[] stress = viscousStressTensor(W, dW);
->>>>>>> 5ec2d4142a9f945b640a30e871dbe8103c144cc9
         double[] flux = new double[nEqs];
         flux[0] = 0;
         for (int d = 0; d < dim; ++d) {
@@ -341,25 +322,6 @@ public class IncompressibleNavierStokes implements Equation {
     }
 	
 	protected double[] viscousStressTensor(double[] W, double[] dW) {
-		double[] velocityJac = new double[dim * dim];
-        for (int d = 0; d < dim; ++d) {
-            for (int f = 0; f < dim; ++f) {
-                velocityJac[dim * d + f] = dW[f * nEqs + d + 1];
-            }
-        }
-
-        // stress tensor calculation
-        double[] stress = new double[dim * dim];
-        for (int d = 0; d < dim; ++d) {
-            for (int f = 0; f < dim; ++f) {
-                stress[dim * d + f] = (velocityJac[dim * d + f] + velocityJac[dim * f + d]);
-            }
-        }
-		
-		return stress;
-	}
-
-    protected double[] viscousStressTensor(double[] W, double[] dW) {
 		double[] velocityJac = new double[dim * dim];
         for (int d = 0; d < dim; ++d) {
             for (int f = 0; f < dim; ++f) {
