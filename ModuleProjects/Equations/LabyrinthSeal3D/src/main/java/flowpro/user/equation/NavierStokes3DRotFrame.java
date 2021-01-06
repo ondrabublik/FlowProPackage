@@ -226,7 +226,7 @@ public class NavierStokes3DRotFrame implements Equation {
         omegaStator = Mat.times(omega, -1.0); //Mat.minusVec(Mat.times(props.getDoubleArray("omegaStator"), tRef),omega);
         omegaRotor = Mat.minusVec(Mat.times(props.getDoubleArray("omegaRotor"), tRef), omega);
         omegaInlet = Mat.minusVec(Mat.times(props.getDoubleArray("omegaInlet"), tRef), omega);
-        rotorExcentricity = props.getDoubleArray("rotorExcentricity"); // chyba!!!!!!!!
+        rotorExcentricity = Mat.times(props.getDoubleArray("rotorExcentricity"), 1/lRef); // chyba!!!!!!!!
 
         // swirl profile
         swirlProfileRadius = null;
@@ -569,7 +569,7 @@ public class NavierStokes3DRotFrame implements Equation {
     }
 
     @Override
-	public double[] normalStress(double[] W, double[] dW, double[] normal) {	
+	public double[] stressVector(double[] W, double[] dW, double[] normal) {	
 		double p = pressure(W);
 		
 		double[] normalStress = new double[dim];

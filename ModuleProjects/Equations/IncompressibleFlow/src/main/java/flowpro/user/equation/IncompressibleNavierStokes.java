@@ -152,7 +152,7 @@ public class IncompressibleNavierStokes implements Equation {
                 for (int d = 0; d < dim; d++) {
                     V += elem.meshVelocity[d] * n[d];
                 }
-                f[0] += V;
+                
                 for (int d = 0; d < dim; d++) {
                     f[d + 1] += V * WR[d + 1];
                 }
@@ -245,7 +245,7 @@ public class IncompressibleNavierStokes implements Equation {
         double[] stress = new double[dim * dim];
         for (int d = 0; d < dim; ++d) {
             for (int f = 0; f < dim; ++f) {
-                stress[dim * d + f] = (velocityJac[dim * d + f] + velocityJac[dim * f + d]) / 2;
+                stress[dim * d + f] = velocityJac[dim * d + f] + velocityJac[dim * f + d];
             }
         }
 
@@ -334,16 +334,38 @@ public class IncompressibleNavierStokes implements Equation {
         return W[0];
     }
 
+    protected double[] viscousStressTensor(double[] W, double[] dW) {
+		double[] velocityJac = new double[dim * dim];
+        for (int d = 0; d < dim; ++d) {
+            for (int f = 0; f < dim; ++f) {
+                velocityJac[dim * d + f] = dW[f * nEqs + d + 1];
+            }
+        }
+
+        // stress tensor calculation
+        double[] stress = new double[dim * dim];
+        for (int d = 0; d < dim; ++d) {
+            for (int f = 0; f < dim; ++f) {
+                stress[dim * d + f] = (velocityJac[dim * d + f] + velocityJac[dim * f + d]);
+            }
+        }
+		
+		return stress;
+	}
+
     @Override
-	public double[] normalStress(double[] W, double[] dW, double[] normal) {	
+	public double[] stressVector(double[] W, double[] dW, double[] normal) {	
 		double p = pressure(W);
-		
-		double[] normalStress = new double[dim];
+		double[] viscousStress = viscousStressTensor(W, dW);
+		double[] stressVector = new double[dim];
 		for (int d = 0; d < dim; ++d) {
-			normalStress[d] -= p * normal[d];
-		}
+			stressVector[d] -= p * normal[d];
+			for (int f = 0; f < dim; ++f) {
+				stressVector[d] += 1 / Re * viscousStress[d * dim + f] * normal[f];
+			}
+		}		
 		
-		return normalStress;
+		return stressVector;
 	}
     
     @Override
@@ -435,7 +457,7 @@ public class IncompressibleNavierStokes implements Equation {
             case "div":
                 double[] div = new double[1];
                 for (int i = 0; i < dim; i++) {
-                    div[0] = dW[nEqs * i + i + 1];
+                    div[0] += dW[nEqs * i + i + 1];
                 }
                 return div;
 
