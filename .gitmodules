@@ -7,9 +7,6 @@
 [submodule "FlowProManager"]
 	path = FlowProManager
 	url = https://github.com/ondrabublik/FlowProManager.git
-[submodule "Fetcher"]
-	path = Fetcher
-	url = https://github.com/ondrabublik/Fetcher.git
 [submodule "ModuleProjects/Equations/Aerodynamics"]
 	path = ModuleProjects/Equations/Aerodynamics
 	url = https://github.com/ondrabublik/FlowPro-Aerodynamics.git
