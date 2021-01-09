@@ -73,7 +73,7 @@ public class IncompressibleNavierStokes implements Equation {
         gravityAcceleration = 9.81;
 
         isDiffusive = props.getBoolean("isFlowViscous");
-
+                       
         // reference values from inlet
         VIn = props.getDoubleArray("VIn");
 
