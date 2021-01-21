@@ -141,7 +141,6 @@ public class Elastic2DRemoteSolver implements Dynamics {
 		this.fluFor = fluFor;
 		this.dt = dt;
 		this.t = t;
-
 		for (int b = 0; b < nBodies; b++) {
 			double[][] points = Mat.times(fluFor[b].stressVectorPositions, lRef);
 			double[][] stressVectors = Mat.times(fluFor[b].stressVectors, pRef);

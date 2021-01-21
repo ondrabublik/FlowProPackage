@@ -32,11 +32,9 @@ public class IncompressibleNavierStokes implements Equation {
     protected double eta;
 
     // inlet boundary condition
-    protected boolean isInletSupersonic;
-    // subsonic inlet boundary condition 
+    // inlet boundary condition 
     protected final double pIn0 = 1; // static pressure
-    protected final double rhoIn0 = 1; // static density
-    // supersonic inlet boundary condition
+    protected final double rhoIn0 = 1; // density
     protected double[] VIn;
 
     // outlet boundary condition
@@ -148,11 +146,12 @@ public class IncompressibleNavierStokes implements Equation {
                 }
                 
                 // for ALE
+                //System.out.println(elem.meshVelocity[1]);
                 double V = 0;
                 for (int d = 0; d < dim; d++) {
                     V += elem.meshVelocity[d] * n[d];
                 }
-                //f[0] += V;
+                f[0] += V;
                 for (int d = 0; d < dim; d++) {
                     f[d + 1] += V * WR[d + 1];
                 }
@@ -272,6 +271,7 @@ public class IncompressibleNavierStokes implements Equation {
             case (BoundaryType.WALL):
                 if (isDiffusive) {
                     double[] u = elem.meshVelocity;
+                    //System.out.println(u[0] + " " + u[1]);
                     WR[0] = WL[0];
 					System.arraycopy(u, 0, WR, 1, dim);
                 } else {
@@ -303,7 +303,7 @@ public class IncompressibleNavierStokes implements Equation {
 //                }
 				double height = 0.41;
 				double y = elem.currentX[1];
-				WR[1] = 1.5 * y * (height-y) / (height*height/4);
+				WR[1] = 1;//1.5 * y * (height-y) / (height*height/4);
                 break;
 
             case (BoundaryType.OUTLET):
