@@ -173,7 +173,7 @@ public class IncompressibleNavierStokes implements Equation {
                 for (int d = 0; d < dim; d++) {
                     V += elem.meshVelocity[d] * n[d];
                 }
-                
+                f[0] += V;
                 for (int d = 0; d < dim; d++) {
                     f[d + 1] += V * WR[d + 1];
                 }
@@ -319,20 +319,27 @@ public class IncompressibleNavierStokes implements Equation {
                 break;
 
             case (BoundaryType.INLET):
-				if (inletType == InletType.VELOCITY) {
-					for (int d = 0; d < dim; ++d) {
-						WR[d + 1] = VIn[d];
-					}
-				} else {
-					double height = 0.41;
-					double y = elem.currentX[1];
-					WR[1] = 1.5 * y * (height-y) / (height*height/4);
-				}
-				
-				double t = elem.currentT * tRef;
-				if (inletType == InletType.PARABOLA2 && t < 2.0) {
-					WR[1] *= (1 - Math.cos(Math.PI / 2 * t)) / 2;
-				}
+                WR[0] = WL[0];				
+                for (int d = 0; d < dim; ++d) {
+                    WR[d + 1] = VIn[d];
+                }
+//				double height = 0.41;
+//				double y = elem.currentX[1];
+//				WR[1] = 1.5 * y * (height-y) / (height*height/4);
+//				if (inletType == InletType.VELOCITY) {
+//					for (int d = 0; d < dim; ++d) {
+//						WR[d + 1] = VIn[d];
+//					}
+//				} else {
+//					double height = 0.41;
+//					double y = elem.currentX[1];
+//					WR[1] = 1.5 * y * (height-y) / (height*height/4);
+//				}
+//				
+//				double t = elem.currentT * tRef;
+//				if (inletType == InletType.PARABOLA2 && t < 2.0) {
+//					WR[1] *= (1 - Math.cos(Math.PI / 2 * t)) / 2;
+//				}
 				
                 break;
 
@@ -477,7 +484,16 @@ public class IncompressibleNavierStokes implements Equation {
                     div[0] += dW[nEqs * i + i + 1];
                 }
                 return div;
-
+            
+            case "vorticity":
+                if (dim == 2) {
+                    double dvdx = dW[2];
+                    double dudy = dW[nEqs + 1];
+                    return new double[] {velocityRef / lRef * (dvdx - dudy)};                
+                } else {
+                    throw new UnsupportedOperationException("quantity \"" + name
+                            + "\" is only available in two dimensions");
+                }
             default:
                 throw new UnsupportedOperationException("undefined value " + name);
         }
