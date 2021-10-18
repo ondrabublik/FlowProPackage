@@ -210,46 +210,62 @@ public class Elastic2DBeam implements Dynamics {
             }
         }
     }
-
-    public void computeBodyMove(double dt, double t, int newtonIter, FluidForces fluFor) {
+	
+	@Override
+	public void computeBodyMove(double dt, double t, int newtonIter, FluidForces[] fluFor) {
         this.dt = dt;
         this.t = t;
-
-        double[][] boundaryForces = fluFor.getBoundaryForce();
-        if (boundaryForces != null) {
-            int[][] boundaryIndexes = fluFor.getFaceIndexes();
-            int nIndex = boundaryForces.length;
-            int dim = boundaryForces[0].length / 2;
-            int[] nbIndex = new int[nBodies];
-
-            // number of bodies faces
-            for (int i = 0; i < nIndex; i++) {
-                nbIndex[boundaryIndexes[i][2] - 2]++;
-            }
-            for (int k = 0; k < nBodies; k++) {
-                double[][] bodyForce = new double[dim][nbIndex[k]];
-                double[][] forceCoord = new double[nbIndex[k]][dim];
-                int s = 0;
-                for (int i = 0; i < nIndex; i++) {
-                    if (boundaryIndexes[i][2] == k + 2) {
-                        for (int j = 0; j < dim; j++) {
-                            bodyForce[j][i] = boundaryForces[s][j];
-                            forceCoord[i][j] = boundaryForces[s][j + dim];
-                        }
-                        s++;
-                    }
-                }
-                double[][] rbfForceCoefficient = computeRadialBasisFunctionCoefficients(forceCoord, bodyForce);
-                double[][] bodyDeformation = bodies[k].computeDeformation(forceCoord, rbfForceCoefficient, t, dt);
-                bodies[k].radialBasisCoefficients = computeRadialBasisFunctionCoefficients(bodies[k].boundaryPointsCoords, bodyDeformation);
-            }
-        } else { // external force free
-            for (int k = 0; k < nBodies; k++) {
-                double[][] bodyDeformation = bodies[k].computeDeformation(null, null, t, dt);
-                bodies[k].radialBasisCoefficients = computeRadialBasisFunctionCoefficients(bodies[k].boundaryPointsCoords, bodyDeformation);
-            }
-        }
+		
+		for (int b = 0; b < nBodies; b++) {
+			double[][] rbfForceCoefficient = computeRadialBasisFunctionCoefficients(fluFor[b].stressVectors,
+					fluFor[b].stressVectorPositions);
+			
+			double[][] bodyDeformation = bodies[b].computeDeformation(fluFor[b].stressVectorPositions, rbfForceCoefficient, t, dt);
+			
+			bodies[b].radialBasisCoefficients = computeRadialBasisFunctionCoefficients(bodies[b].boundaryPointsCoords,
+					bodyDeformation);
+		}        
     }
+
+//    public void computeBodyMoveOld(double dt, double t, int newtonIter, FluidForces fluFor) {
+//        this.dt = dt;
+//        this.t = t;
+//
+//        double[][] boundaryForces = fluFor.getBoundaryForce();
+//        if (boundaryForces != null) {
+//            int[][] boundaryIndexes = fluFor.getFaceIndexes();
+//            int nIndex = boundaryForces.length;
+//            int dim = boundaryForces[0].length / 2;
+//            int[] nbIndex = new int[nBodies];
+//
+//            // number of bodies faces
+//            for (int i = 0; i < nIndex; i++) {
+//                nbIndex[boundaryIndexes[i][2] - 2]++;
+//            }
+//            for (int k = 0; k < nBodies; k++) {
+//                double[][] bodyForce = new double[dim][nbIndex[k]];
+//                double[][] forceCoord = new double[nbIndex[k]][dim];
+//                int s = 0;
+//                for (int i = 0; i < nIndex; i++) {
+//                    if (boundaryIndexes[i][2] == k + 2) {
+//                        for (int j = 0; j < dim; j++) {
+//                            bodyForce[j][i] = boundaryForces[s][j];
+//                            forceCoord[i][j] = boundaryForces[s][j + dim];
+//                        }
+//                        s++;
+//                    }
+//                }
+//                double[][] rbfForceCoefficient = computeRadialBasisFunctionCoefficients(forceCoord, bodyForce);
+//                double[][] bodyDeformation = bodies[k].computeDeformation(forceCoord, rbfForceCoefficient, t, dt);
+//                bodies[k].radialBasisCoefficients = computeRadialBasisFunctionCoefficients(bodies[k].boundaryPointsCoords, bodyDeformation);
+//            }
+//        } else { // external force free
+//            for (int k = 0; k < nBodies; k++) {
+//                double[][] bodyDeformation = bodies[k].computeDeformation(null, null, t, dt);
+//                bodies[k].radialBasisCoefficients = computeRadialBasisFunctionCoefficients(bodies[k].boundaryPointsCoords, bodyDeformation);
+//            }
+//        }
+//    }
 
     public void nextTimeLevel() {
         /*
