@@ -30,6 +30,7 @@ public class NavierStokes3DRotFrame implements Equation {
     protected boolean isDiffusive;
 
     protected double kapa; // Poissonova konstanta
+    protected double cv;
     protected double Re; // Reynoldsovo cislo
     protected double Pr; // Prandtlovo cislo
 
@@ -126,7 +127,7 @@ public class NavierStokes3DRotFrame implements Equation {
         this.dim = props.getInt("dimension");
         
         // heat capacity ratio
-        double cv, cp;
+        double cp;
         if (props.containsKey("kappa") && props.containsKey("cv") && !props.containsKey("cp")) {
             kapa = props.getDouble("kappa");
             cv = props.getDouble("cv");

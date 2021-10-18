@@ -14,7 +14,7 @@ import flowpro.api.FlowProProperties;
  *
  * @author obublik
  */
-public class CylindricalTransform implements DomainTransformationObject{
+public class CylindricalTransformZ implements DomainTransformationObject{
     
     @Override
     public void init(FlowProProperties props){

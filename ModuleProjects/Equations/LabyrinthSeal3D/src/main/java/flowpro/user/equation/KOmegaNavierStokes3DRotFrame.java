@@ -14,50 +14,64 @@ import java.io.IOException;
  *
  * @author obublik
  */
-public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFrame {
+public class KOmegaNavierStokes3DRotFrame extends NavierStokes3DRotFrame {
     
-    double vtIn; // turbulence intensity at the inlet
+    protected static final double P_TOL = 1e-1;
 
-    // model turbulence
-    int model;
-    double sigma = 2.0 / 3;
-    double cb1 = 0.1355;
-    double cb2 = 0.622;
-    double ka = 0.41;
-    double cw1 = cb1 / (ka * ka) + (1 + cb2) / sigma;
-    double cw2 = 0.3;
-    double cw3 = 2;
-    double cv1 = 7.1;
-    double ct1 = 1;
-    double ct2 = 2;
-    double ct3 = 1.2;
-    double ct4 = 0.5;
-    double Prt = 0.9;
-    double C_prod = 2;
+    double kIn;
+    double omIn;
+    double omWall;
+    
+    double kref;
+    double omref;
+    double muref;
+
+    double LIM_TOL;
+
+    // Sutherland constant
+    double Suth;
+    
+    // parameters of turbulence model
+    double a1;
+    double sk1;
+    double som1;
+    double alpha1;
+    double beta1;
+    double betast;   // beta star 
+    double sk2;
+    double som2;
+    double alpha2;
+    double beta2;
+    double Prt;
 
     public void init(FlowProProperties props) throws IOException {
-
-        // inlet
-        vtIn = props.getDouble("vtIn");
-
-        // parameters of turbulence model
-        sigma = props.getDouble("sigma");
-        cb1 = props.getDouble("cb1");
-        cb2 = props.getDouble("cb2");
-        ka = props.getDouble("ka");
-        cw1 = cb1 / (ka * ka) + (1 + cb2) / sigma;
-        cw2 = props.getDouble("cw2");
-        cw3 = props.getDouble("cw3");
-        cv1 = props.getDouble("cv1");
-        ct1 = props.getDouble("ct1");
-        ct2 = props.getDouble("ct2");
-        ct3 = props.getDouble("ct3");
-        ct4 = props.getDouble("ct4");
-        Prt = props.getDouble("Prt");
-        C_prod = props.getDouble("C_prod");
-
+        int dimension = props.getInt("dimension");
         super.init(props);
         this.nEqs = 6;
+
+        // inlet
+        kIn = props.getDouble("kIn");
+        omIn = props.getDouble("omIn");
+        if (isInletSupersonic) {
+            WIn[dimension + 2] = kIn;
+            WIn[dimension + 3] = omIn;
+        }
+        
+        // Sutherland
+        Suth = props.getDouble("SuthConst");
+        
+        // parameters of turbulence model
+        a1 = props.getDouble("a1");
+        sk1 = props.getDouble("sk1");
+        som1 = props.getDouble("som1");
+        alpha1 = props.getDouble("alpha1");
+        beta1 = props.getDouble("beta1");
+        betast = props.getDouble("betast");
+        sk2 = props.getDouble("sk2");
+        som2 = props.getDouble("som2");
+        alpha2 = props.getDouble("alpha2");
+        beta2 = props.getDouble("beta2");
+        Prt = props.getDouble("Prt");
     }
 
     @Override
@@ -73,7 +87,7 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
             double wIn = VIn * Math.sin(attackAngleAlfa) * Math.sin(attackAngleBeta);
             double EIn = pOut / (kapa - 1) + 0.5 * rhoIn * VIn * VIn;
 
-            return new double[]{rhoIn, rhoIn * uIn, rhoIn * vIn, rhoIn * wIn, EIn, rhoIn * vtIn};
+            return new double[]{rhoIn, rhoIn * uIn, rhoIn * vIn, rhoIn * wIn, EIn, rhoIn * kIn, rhoIn * omIn};
         }
     }
 
@@ -87,10 +101,10 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
         double p;
 
         switch (TT) {
-            case (BoundaryType.WALL):
-            case (BoundaryType.INVISCID_WALL):
-            case (BoundaryType.STATOR):
-            case (BoundaryType.ROTOR): // stena
+            case (NavierStokes3DRotFrame.BoundaryType.WALL):
+            case (NavierStokes3DRotFrame.BoundaryType.INVISCID_WALL):
+            case (NavierStokes3DRotFrame.BoundaryType.STATOR):
+            case (NavierStokes3DRotFrame.BoundaryType.ROTOR): // stena
                 p = pressure(WL, elem.currentX);
                 fn[0] = 0;
                 fn[1] = p * n[0];
@@ -98,13 +112,14 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
                 fn[3] = p * n[2];
                 fn[4] = 0;
                 fn[5] = 0;
+                fn[6] = 0;
                 break;
 
-            case (BoundaryType.INLET): // vstup
+            case (NavierStokes3DRotFrame.BoundaryType.INLET): // vstup
                 fn = convectiveFlux(WR, n, elem);
                 break;
 
-            case (BoundaryType.OUTLET): // vystup
+            case (NavierStokes3DRotFrame.BoundaryType.OUTLET): // vystup
                 fn = convectiveFlux(WR, n, elem);
                 break;
 
@@ -139,6 +154,7 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
         f[3] = W[3] * V + p * n[2];
         f[4] = (W[4] + p) * V;
         f[5] = W[5] * V;
+        f[6] = W[6] * V;
 
         return f;
     }
@@ -188,41 +204,66 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
             stress[dim * d + d] += lam * trace;
         }
 
-        double vt = W[5] / rho;
-        if(vt < 0){
-            vt = 0;
+        double k = max(W[dim + 2]/rho,1e-10);
+        double om = W[dim + 3] / rho;
+        
+        // sutherland relation
+        double etaTemp = sutherland(rho, p);
+        
+        double vortic = Math.abs(velocityJac[1]-velocityJac[2]);
+        double walldist = Math.abs(elem.currentWallDistance);  
+        if (walldist < 1e-5){                // zero at wall makes problems - adjust value according to mesh
+            walldist = 1e-5;
         }
-        double[] dvt = new double[dim]; 
+        double arg2 = max(2*Math.sqrt(k)/(0.09*Math.exp(om)*walldist)/Math.sqrt(Re),500*etaTemp/rho/(walldist*walldist*Math.exp(om))/Re);
+        double F2 = Math.tanh(arg2*arg2);
+        
+        double mut = max(0, rho*a1*k / max(a1*Math.exp(om),vortic*F2));
+
+        double[] turbulentStress = new double[dim * dim];
+        for (int i = 0; i < stress.length; i++) {
+            turbulentStress[i] = stress[i] * mut;
+        }
+        double kMax = 2.0 / 3 * max(0, rho*k);
         for (int d = 0; d < dim; ++d) {
-            dvt[d] = (dW[5] - dW[d * nEqs] * vt)/rho;
+            turbulentStress[dim * d + d] -= kMax;
         }
-        
-        double xi = rho * vt; // vt/v
-        if(xi > 1e5){
-            xi = 1e5;
-        }
-        double fv1 = xi * xi * xi / (xi * xi * xi + cv1 * cv1 * cv1);
-        double mut = rho * vt * fv1;
-        
-        // add turbulence stress
+
+        double[] kDer = new double[dim];
+        double[] omDer = new double[dim];
         for (int d = 0; d < dim; ++d) {
-            for (int f = 0; f < dim; ++f) {
-                stress[dim * d + f] *= (1 + mut);
-            }
+            kDer[d] = (dW[d * nEqs + dim + 2] - dW[d * nEqs] * k) / rho;
+            omDer[d] = (dW[d * nEqs + dim + 3] - dW[d * nEqs] * om) / rho;
+        }
+
+        double constant = kapa / (kapa - 1) * (etaTemp / Pr + mut / Prt);
+        
+        double omkDer = 0;
+        for (int d = 0; d < dim; ++d) {
+            omkDer += omDer[d] * kDer[d];
         }
         
-        double constant = kapa / (kapa - 1)*(1/ Pr + mut / Prt);
+        double CD = max(2*som2*rho*omkDer,1e-10);
+        double arg11 = max(Math.sqrt(k)/(0.09*Math.exp(om)*walldist)/Math.sqrt(Re),500*etaTemp/rho/(Math.exp(om)*walldist*walldist)/Re);
+        double arg12 = 4*rho*som2*k/(CD*walldist*walldist);
+        double arg1 = min(arg11,arg12);   
+        double F1 = Math.tanh(Math.pow(arg1,4));
+        
+        double sk0 = F1*sk1 + (1-F1)*sk2;
+        double som0 = F1*som1 + (1-F1)*som2;
+        
         double[] flux = new double[nEqs];
-        flux[0] = 0;
         for (int d = 0; d < dim; ++d) {
             double tmp = .0;
             for (int f = 0; f < dim; ++f) {
-                flux[f + 1] += stress[dim * d + f] * n[d] / Re;
-                tmp += velocity[f] * stress[dim * d + f];
+                flux[f + 1] += (etaTemp * stress[dim * d + f] + turbulentStress[dim * d + f]) * n[d] / Re;
+                tmp += velocity[f] * (etaTemp * stress[dim * d + f] + turbulentStress[dim * d + f]);
             }
             flux[dim + 1] += (tmp + constant * pOverRhoDer[d]) * n[d] / Re;
-            flux[dim + 2] += 1 / (Re * sigma) * (1 + rho * vt) * dvt[d] * n[d];
+            flux[dim + 2] += (etaTemp + sk0 * mut) / Re * kDer[d] * n[d];
+            flux[dim + 3] += (etaTemp + som0 * mut) / Re * omDer[d] * n[d];
         }
+        
         return flux;
     }
 
@@ -238,7 +279,7 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
         source[2] = Fcentrifugal[1] + Fcoriolis[1];
         source[3] = Fcentrifugal[2] + Fcoriolis[2];
 
-        // sa model
+        W[0] = limiteRho(W[0]);
         double rho = W[0];
 
         double lam = -2. / 3; // Stokesuv vztah
@@ -247,60 +288,84 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
         for (int d = 0; d < dim; ++d) {
             velocity[d] = W[d + 1] / rho;
         }
-
+        
         double[] velocityJac = new double[dim * dim];
         for (int d = 0; d < dim; ++d) {
             for (int f = 0; f < dim; ++f) {
                 velocityJac[dim * d + f] = (dW[f * nEqs + d + 1] - dW[f * nEqs] * velocity[d]) / rho;
             }
         }
+        
+        double p = pressure(W);
 
-        // stress tensor calculation
-        double[] stress = new double[dim * dim];
+        double k = max(W[dim + 2]/rho,1e-10);
+        double om = W[dim + 3] / rho;
+        double expOm = Math.exp(om);
+        
+        double etaTemp = sutherland(rho, p);
+        
+        double vortic = Math.abs(velocityJac[1]-velocityJac[2]);
+        double walldist = Math.abs(elem.currentWallDistance);  
+        if (walldist < 1e-5){                // zero at wall makes problems - adjust value according to mesh
+            walldist = 1e-5;
+        }
+        double arg2 = max(2*Math.sqrt(k)/(0.09*Math.exp(om)*walldist)/Math.sqrt(Re),500*etaTemp/rho/(walldist*walldist*Math.exp(om))/Re);
+        double F2 = Math.tanh(arg2*arg2);
+        
+        double mut = max(0, rho*a1*k / max(a1*Math.exp(om),vortic*F2));      
+
+        // turbulentStress tensor calculation
+        double[] turbulentStress = new double[dim * dim];
         double trace = .0;
         for (int d = 0; d < dim; ++d) {
             trace += velocityJac[dim * d + d];
             for (int f = 0; f < dim; ++f) {
-                stress[dim * d + f] = velocityJac[dim * d + f] + velocityJac[dim * f + d];
+                turbulentStress[dim * d + f] = mut * (velocityJac[dim * d + f] + velocityJac[dim * f + d]);
             }
         }
+        double kMax = 2.0 / 3 * max(0, rho*k);
         for (int d = 0; d < dim; ++d) {
-            stress[dim * d + d] += lam * trace;
+            turbulentStress[dim * d + d] += mut * lam * trace - kMax;
         }
-        double Smag = matrixMagnitude(stress) / 2;
 
-        double vt = max(0, W[dim + 2] / rho);
-        double vtDerMag = 0;
+        double omkDer = 0;
+        double omDerSqr = 0;
         for (int d = 0; d < dim; ++d) {
-            double vtDer = 1 / rho * (dW[d * nEqs + dim + 2] - dW[d * nEqs] * vt);
-            vtDerMag += vtDer * vtDer;
+            double kDer = (dW[d * nEqs + dim + 2] - dW[d * nEqs] * k) / rho;
+            double omDer = (dW[d * nEqs + dim + 3] - dW[d * nEqs] * om) / rho;
+            omkDer += omDer * kDer;
+            omDerSqr += omDer * omDer;
         }
 
-        // turbulence limit
-        if (vt < 0) {
-            vt = 0;
+        double Tv = 0;
+        for (int d = 0; d < dim; d++) {
+            for (int f = 0; f < dim; f++) {
+                Tv += turbulentStress[dim * d + f] * velocityJac[dim * d + f];
+            }
         }
-
-        double D = elem.currentWallDistance;
-
-        double xi = rho*vt; // vt/v
-        if(xi > 1e5){
-            xi = 1e5;
-        }
-        double ft2 = 0; //ct3*Math.exp(-ct4*xi*xi);
-        double fv1 = xi * xi * xi / (xi * xi * xi + cv1 * cv1 * cv1);
-        double fv2 = 1 - xi / (1 + xi * fv1);
-        double Om = rotationMagnitude(velocityJac);
-        // S = Om + C_prod * Math.min(0, Smag - Om) + 1 / Re * vt / (ka * ka * D * D) * fv2;
-        double S = Om + 1 / Re * vt / (ka * ka * D * D) * fv2;
-        double rt = vt / (Re * S * ka * ka * D * D);
-        if (rt > 10) {
-            rt = 10;
-        }
-        double g = rt + cw2 * (Math.pow(rt, 6.0) - rt);
-        double fw = g * Math.pow((1 + Math.pow(cw3, 6.0)) / (Math.pow(g, 6.0) + Math.pow(cw3, 6.0)), 1.0 / 6);
+              
+        double CD = max(2*som2*rho*omkDer,1e-10);
+        double arg11 = max(Math.sqrt(k)/(0.09*Math.exp(om)*walldist)/Math.sqrt(Re),500*etaTemp/rho/(Math.exp(om)*walldist*walldist)/Re);
+        double arg12 = 4*rho*som2*k/(CD*walldist*walldist);
+        double arg1 = min(arg11,arg12);   
+        double F1 = Math.tanh(Math.pow(arg1,4));
         
-        source[dim + 2] = limitDestruction(1 / Re * rho * cb2 * vtDerMag + cb1 * (1 - ft2) * rho * S * vt - 1 / Re * (cw1 * fw - cb1 / (ka * ka) * ft2) / rho * (rho * vt / D) * (rho * vt / D));
+        //double sk0 = F1*sk1 + (1-F1)*sk2;
+        double som0 = F1*som1 + (1-F1)*som2;
+        double alpha0 = F1*alpha1 + (1-F1)*alpha2;
+        double beta0 = F1*beta1 + (1-F1)*beta2;
+
+        if (Tv > 10 * betast * rho * k * expOm) {   
+            Tv = 10 * betast * rho * k * expOm;
+        }
+
+        double Tvom = alpha0 * rho / mut /expOm * Tv;   
+        if (Tvom > 10 * beta0 * rho * expOm) {     // moje zmena, opatrne (bylo 100*...)
+            Tvom = 10 * beta0 * rho * expOm;
+        }
+
+        source[dim + 2] = max(Tv - betast * rho * k * expOm, 0);  
+        source[dim + 3] = max(Tvom - beta0 * rho * expOm + 1 / Re * som2*rho/expOm *omkDer *2*(1-F1) + 1 / Re * (etaTemp + som0 * mut) * omDerSqr, 0);
         return source;
     }
 
@@ -311,7 +376,7 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
         double[] WR = new double[nEqs];
         double p = pressure(WL, elem.currentX);
         switch (TT) {
-            case (BoundaryType.WALL): // stena
+            case (NavierStokes3DRotFrame.BoundaryType.WALL): // stena
                 if (isDiffusive) {
                     WR[0] = WL[0];
                     WR[1] = 0;
@@ -319,12 +384,13 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
                     WR[3] = 0;
                     WR[4] = p / (kapa - 1);
                     WR[5] = 0;
+                    WR[6] = WL[dim + 3];
                 } else {
                     System.arraycopy(WL, 0, WR, 0, nEqs);
                 }
                 break;
 
-            case (BoundaryType.STATOR): // stator
+            case (NavierStokes3DRotFrame.BoundaryType.STATOR): // stator
                 if (isDiffusive) {
                     double[] uRot = Mat.cross(omegaStator, elem.currentX);
                     WR[0] = WL[0];
@@ -333,12 +399,13 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
                     WR[3] = WR[0] * uRot[2];
                     WR[4] = p / (kapa - 1) + (WR[1] * WR[1] + WR[2] * WR[2] + WR[3] * WR[3]) / (2 * WR[0]) - WR[0] * Math.pow(Mat.L2Norm(Mat.cross(omega, elem.currentX)), 2) / 2;
                     WR[5] = 0;
+                    WR[6] = WL[dim + 3];
                 } else {
                     System.arraycopy(WL, 0, WR, 0, nEqs);
                 }
                 break;
 
-            case (BoundaryType.ROTOR): // rotor
+            case (NavierStokes3DRotFrame.BoundaryType.ROTOR): // rotor
                 if (isDiffusive) {
                     double[] uRot = Mat.cross(omegaRotor, Mat.minusVec(elem.currentX, rotorExcentricity));
                     WR[0] = WL[0];
@@ -347,12 +414,13 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
                     WR[3] = WR[0] * uRot[2];
                     WR[4] = p / (kapa - 1) + (WR[1] * WR[1] + WR[2] * WR[2] + WR[3] * WR[3]) / (2 * WR[0]) - WR[0] * Math.pow(Mat.L2Norm(Mat.cross(omega, elem.currentX)), 2) / 2;
                     WR[5] = 0;
+                    WR[6] = WL[dim + 3];
                 } else {
                     System.arraycopy(WL, 0, WR, 0, nEqs);
                 }
                 break;
 
-            case (BoundaryType.INLET):
+            case (NavierStokes3DRotFrame.BoundaryType.INLET):
                 if (WIn[0] == -1) { // subsonicky vstup
                     double Minl;
                     if (p > pIn0) {
@@ -386,7 +454,8 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
                     WR[2] = Rinl * vinl;
                     WR[3] = Rinl * winl;
                     WR[4] = Einl;
-                    WR[5] = Rinl * vtIn;
+                    WR[5] = Rinl * kIn;
+                    WR[6] = Rinl * omIn;
                 } else { // supersonicky vstup
                     WR[0] = WIn[0];
                     WR[1] = WIn[1];
@@ -394,15 +463,17 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
                     WR[3] = WIn[3];
                     WR[4] = WIn[4];
                     WR[5] = WIn[0] * WIn[5];
+                    WR[6] = WIn[0] * WIn[6];
                 }
                 break;
 
-            case (BoundaryType.OUTLET):
+            case (NavierStokes3DRotFrame.BoundaryType.OUTLET):
                 double ro = WL[0];
                 double uo = WL[1] / WL[0];
                 double vo = WL[2] / WL[0];
                 double wo = WL[3] / WL[0];
-                double vtOut = WL[5] / WL[0];
+                double kOut = WL[5] / WL[0];
+                double omOut = WL[5] / WL[0];
                 double ao = Math.sqrt(kapa * p / ro);
                 double Mo = Math.sqrt(uo * uo + vo * vo + wo * wo) / ao;
                 double Eo,
@@ -418,18 +489,33 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
                 WR[2] = ro * vo;
                 WR[3] = ro * wo;
                 WR[4] = Eo;
-                WR[5] = ro * vtOut;
+                WR[5] = ro * kOut;
+                WR[5] = ro * omOut;
                 break;
 
-            case (BoundaryType.INVISCID_WALL): // nevazka stena
+            case (NavierStokes3DRotFrame.BoundaryType.INVISCID_WALL): // nevazka stena
                 System.arraycopy(WL, 0, WR, 0, nEqs);
                 break;
         }
         return WR;
     }
 
+    public double sutherland(double rho, double p) {
+        double T = p / rho;
+        double TRef = 1/ (cv*(kapa - 1)) * pRef / rhoRef;
+        return Math.pow(T,1.5)*(1+Suth/TRef)/(T + Suth/TRef);
+    }
+    
     public double max(double a, double b) {
         if (a > b) {
+            return a;
+        } else {
+            return b;
+        }
+    }
+    
+    public double min(double a, double b) {
+        if (a < b) {
             return a;
         } else {
             return b;
@@ -471,13 +557,13 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
 
     @Override
     public boolean isIPFace(int TT) {
-        if (TT == BoundaryType.WALL || TT == BoundaryType.STATOR || TT == BoundaryType.ROTOR) {
+        if (TT == NavierStokes3DRotFrame.BoundaryType.WALL || TT == NavierStokes3DRotFrame.BoundaryType.STATOR || TT == NavierStokes3DRotFrame.BoundaryType.ROTOR) {
             return true;
         } else {
             return false;
         }
     }
-
+    
     @Override
     public double[] getResults(double[] W, double[] dW, double[] X, String name) {
         double[] uRot;
@@ -525,9 +611,7 @@ public class SpalartAllmarasNavierStokes3DRotFrame extends NavierStokes3DRotFram
                 return new double[]{pRef * pressure(W)};
                 
             case "mut":
-                double xi = Math.max(W[dim+2],0); // vt/v
-                double fv1 = xi * xi * xi / (xi * xi * xi + cv1 * cv1 * cv1);
-                return new double[]{W[dim + 2]*fv1};
+                return new double[]{W[dim + 2] / Math.exp(W[dim + 3] / W[0])};
                 
             default:
                 throw new UnsupportedOperationException("undefined value " + name);

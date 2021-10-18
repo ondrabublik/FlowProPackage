@@ -298,12 +298,12 @@ public class IncompressibleNavierStokes implements Equation {
 
             case (BoundaryType.INLET):
                 WR[0] = WL[0];				
-//                for (int d = 0; d < dim; ++d) {
-//                    WR[d + 1] = VIn[d];
-//                }
-				double height = 0.41;
-				double y = elem.currentX[1];
-				WR[1] = 1;//1.5 * y * (height-y) / (height*height/4);
+                for (int d = 0; d < dim; ++d) {
+                    WR[d + 1] = VIn[d];
+                }
+//				double height = 0.41;
+//				double y = elem.currentX[1];
+//				WR[1] = 1.5 * y * (height-y) / (height*height/4);
                 break;
 
             case (BoundaryType.OUTLET):
@@ -447,7 +447,16 @@ public class IncompressibleNavierStokes implements Equation {
                     div[0] += dW[nEqs * i + i + 1];
                 }
                 return div;
-
+            
+            case "vorticity":
+                if (dim == 2) {
+                    double dvdx = dW[2];
+                    double dudy = dW[nEqs + 1];
+                    return new double[] {velocityRef / lRef * (dvdx - dudy)};                
+                } else {
+                    throw new UnsupportedOperationException("quantity \"" + name
+                            + "\" is only available in two dimensions");
+                }
             default:
                 throw new UnsupportedOperationException("undefined value " + name);
         }
