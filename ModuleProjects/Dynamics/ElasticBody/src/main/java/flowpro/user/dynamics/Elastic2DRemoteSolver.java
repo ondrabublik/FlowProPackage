@@ -141,7 +141,9 @@ public class Elastic2DRemoteSolver implements Dynamics {
 		this.fluFor = fluFor;
 		this.dt = dt;
 		this.t = t;
-		for (int b = 0; b < nBodies; b++) {
+
+//		for (int b = 0; b < nBodies; b++) {
+		int b = 0;
 			double[][] points = Mat.times(fluFor[b].stressVectorPositions, lRef);
 			double[][] stressVectors = Mat.times(fluFor[b].stressVectors, pRef);
 			double[][] stressTensors = Mat.times(fluFor[b].stressTensors, pRef);
@@ -154,7 +156,7 @@ public class Elastic2DRemoteSolver implements Dynamics {
 
 			bodies[b].radialBasisCoefficients = computeRadialBasisFunctionCoefficients(bodies[b].boundaryPoints,
 					bodies[b].boundaryDisplacement);
-		}
+//		}
 	}
 
 //	@Override
@@ -224,14 +226,15 @@ public class Elastic2DRemoteSolver implements Dynamics {
 	@Override
 	public void savePositionsAndForces() throws IOException {		
 		try (PrintWriter writer = new PrintWriter(new BufferedWriter(new FileWriter(resultsFile, true)))) {
-			writer.format("%.15e 0 0 0 ", t * tRef);
+			writer.format("%.15e ", t * tRef);
 			for (FluidForces forces : fluFor) {
+				writer.print("0 0 0 ");
 				for (int d = 0; d < 2; d++) {
 					writer.format("%.15e ", forces.force[d] * pRef * lRef * lRef);
 				}
-				writer.print("0");
+				writer.print("0 ");
 			}				
-			writer.print('\n');
+			writer.println();
         }
 	}
 
@@ -430,7 +433,7 @@ class JsonRemoteStructureSolver implements RemoteStructureSolver {
 			json.put("innerIter", innerIter);
 			json.put("bodyIndex", bodyNumber);
 			json.put("stressCoords", new JSONArray(stressCoords));
-			json.put("stressRBFCoeffs", new JSONArray(stressRBFCoefficient));
+//			json.put("stressRBFCoeffs", new JSONArray(stressRBFCoefficient));
 			json.put("stressVectors", new JSONArray(stressVectors));
 			json.put("stressTensors", new JSONArray(stressTensors));
 

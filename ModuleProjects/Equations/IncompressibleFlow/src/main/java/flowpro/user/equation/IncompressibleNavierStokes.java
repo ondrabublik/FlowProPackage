@@ -16,6 +16,12 @@ public class IncompressibleNavierStokes implements Equation {
         static final int OUTLET = -3;
         static final int INVISCID_WALL = -4;
     }
+	
+	protected enum InletType {
+		VELOCITY, PARABOLA, PARABOLA2
+	}
+	
+	protected InletType inletType;
 		
     protected int dim;
     protected int nEqs;
@@ -41,7 +47,7 @@ public class IncompressibleNavierStokes implements Equation {
     protected double pOut; // pressure
 
     double gravityAcceleration;
-
+		
     @Override
     public int dim() {
         return dim;
@@ -89,6 +95,22 @@ public class IncompressibleNavierStokes implements Equation {
             lRef = props.getDouble("lRef");
         } else {
             lRef = 1;
+        }
+		
+		if (props.containsKey("inletType")) {
+			String type = props.getString("inletType").toUpperCase();
+			
+            if (InletType.VELOCITY.name().toLowerCase().equals(type)) {
+				inletType = InletType.VELOCITY;
+			} else if (InletType.PARABOLA.name().toLowerCase().equals(type)) {
+				inletType = InletType.PARABOLA;
+			} else if (InletType.PARABOLA2.name().toLowerCase().equals(type)) {
+				inletType = InletType.PARABOLA2;
+			} else {
+				throw new IOException("unknown inlet type \'" + type + "\'");
+			}
+        } else {
+            inletType = InletType.VELOCITY;
         }
 
         velocityRef = 0;
@@ -304,6 +326,21 @@ public class IncompressibleNavierStokes implements Equation {
 //				double height = 0.41;
 //				double y = elem.currentX[1];
 //				WR[1] = 1.5 * y * (height-y) / (height*height/4);
+//				if (inletType == InletType.VELOCITY) {
+//					for (int d = 0; d < dim; ++d) {
+//						WR[d + 1] = VIn[d];
+//					}
+//				} else {
+//					double height = 0.41;
+//					double y = elem.currentX[1];
+//					WR[1] = 1.5 * y * (height-y) / (height*height/4);
+//				}
+//				
+//				double t = elem.currentT * tRef;
+//				if (inletType == InletType.PARABOLA2 && t < 2.0) {
+//					WR[1] *= (1 - Math.cos(Math.PI / 2 * t)) / 2;
+//				}
+				
                 break;
 
             case (BoundaryType.OUTLET):
