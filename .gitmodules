@@ -19,12 +19,10 @@
 [submodule "ModuleProjects/Equations/ScalarEquations"]
 	path = ModuleProjects/Equations/ScalarEquations
 	url = https://github.com/ondrabublik/FlowPro-Scalar-equations.git
-[submodule "ModuleProjects/Equations/IncompressibleFlow"]
-	path = ModuleProjects/Equations/IncompressibleFlow
-	url = https://github.com/ondrabublik/Incompressible-flow.git
 [submodule "ModuleProjects/SolutionMonitor"]
 	path = ModuleProjects/SolutionMonitor
 	url = https://github.com/ondrabublik/SolutionMonitor.git
 [submodule "ModuleProjects/FunctionalsOfInterest"]
 	path = ModuleProjects/FunctionalsOfInterest
 	url = https://github.com/ondrabublik/FunctionalsOfInterest.git
+
