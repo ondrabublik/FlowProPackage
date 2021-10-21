@@ -26,3 +26,6 @@
 	path = ModuleProjects/FunctionalsOfInterest
 	url = https://github.com/ondrabublik/FunctionalsOfInterest.git
 
+[submodule "ModuleProjects/Equations/IncompressibleFlow"]
+	path = ModuleProjects/Equations/IncompressibleFlow
+	url = https://github.com/ondrabublik/Incompressible-flow.git
