@@ -29,3 +29,6 @@
 [submodule "ModuleProjects/Equations/IncompressibleFlow"]
 	path = ModuleProjects/Equations/IncompressibleFlow
 	url = https://github.com/ondrabublik/Incompressible-flow.git
+[submodule "ModuleProjects/Dynamics/ElasticBody"]
+	path = ModuleProjects/Dynamics/ElasticBody
+	url = https://github.com/ondrabublik/FlowPro-ElasticBodyDynamics.git
