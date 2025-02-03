@@ -7,9 +7,6 @@ package flowpro.user.domaintransformationobject;
 
 import flowpro.api.Complex;
 import static flowpro.api.Complex.copy;
-import static flowpro.api.Complex.cos;
-import static flowpro.api.Complex.multiply;
-import static flowpro.api.Complex.sin;
 import flowpro.api.DomainTransformationObject;
 import flowpro.api.FlowProProperties;
 

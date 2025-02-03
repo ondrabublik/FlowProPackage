@@ -13,7 +13,6 @@ if (!moduleDir.exists()) {
 
 def File modelProjectDir = new File("${rootDir}/ModuleProjects")
 
-
 subprojects {
     def projectName = "$project.name"
     if (projectName != 'FlowPro' && projectName != 'FlowProAPI' && projectName != 'FlowProManager') {
@@ -57,7 +56,6 @@ project(':FlowProManager') {
     jar.finalizedBy copyJar
 }
 
-
 project(':FlowPro') {
     dependencies {
         implementation project(':FlowProAPI')
@@ -77,4 +75,3 @@ task mergedJavadoc(type: Javadoc, description: 'Creates Javadoc from all the pro
     }
 }
 
-// buildScan { licenseAgreementUrl = 'https://gradle.com/terms-of-service'; licenseAgree = 'yes' }

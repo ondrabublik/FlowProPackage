@@ -26,7 +26,8 @@ public class CylindricalTransform2PI implements DomainTransformationObject{
     
     @Override
     public double[] transform(double[] X) {
-        return new double[]{X[0], X[1] * Math.cos(2*Math.PI*X[2]), -X[1] * Math.sin(2*Math.PI*X[2])};
+//        return new double[]{X[0], X[1] * Math.cos(2*Math.PI*X[2]), -X[1] * Math.sin(2*Math.PI*X[2])};
+        return new double[]{X[0], X[1] * Math.cos(X[2]), X[1] * Math.sin(X[2])};
     }
     
     @Override
@@ -36,7 +37,7 @@ public class CylindricalTransform2PI implements DomainTransformationObject{
         Y[0] = copy(X[0]);
         Y[1] = multiply(X[1],cos(multiply(c,X[2])));
         Y[2] = multiply(multiply(X[1],sin(multiply(c,X[2]))),new Complex(-1,0));
-        
+                
         return Y;
     }
 }
